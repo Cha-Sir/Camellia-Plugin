@@ -5,8 +5,7 @@
  * @description 处理查看个人信息、地图/武器列表、排行榜和帮助。
  */
 
-// 从 camellia-plugin/apps/handlers/infoHandler.js 到 camellia-plugin/utils/
-import { getPlayerData, getMaps, getWeapons, getAllPlayerData } from '../../utils/dataManager.js';
+import { getPlayerData, getMaps, getWeapons, getAllPlayerData, getTitles } from '../../utils/dataManager.js';
 import { makeForwardMsgWithContent } from '../../utils/messageHelper.js';
 import { MAX_MESSAGE_LENGTH, VALID_STRATEGIES } from '../../utils/constants.js';
 
@@ -26,13 +25,25 @@ export async function handleViewMyInfo(e, pluginInstance) {
     }
 
     let infoMsg = "";
+    const displayedNickname = playerData.activeTitle ? `【${playerData.activeTitle}】 ${playerData.nickname}` : playerData.nickname;
+
     if (isNewPlayer) {
-        infoMsg += `欢迎新晋调查员，${playerData.nickname}！您的个人档案已建立。\n`;
+        infoMsg += `欢迎新晋调查员，${displayedNickname}！您的个人档案已建立。\n`;
         infoMsg += "--- 这是您的初始档案信息 ---\n";
     } else {
-        infoMsg += `--- 调查员 ${playerData.nickname} 的个人档案 ---\n`;
+        infoMsg += `--- 调查员 ${displayedNickname} 的个人档案 ---\n`;
     }
     infoMsg += `资金: ${playerData.funds}\n`;
+
+    // 显示称号信息
+    infoMsg += `当前身份标识: ${playerData.activeTitle ? `【${playerData.activeTitle}】` : '无'}\n`;
+    if (playerData.purchasedTitles && playerData.purchasedTitles.length > 0) {
+        infoMsg += `已认证标识 (${playerData.purchasedTitles.length}): ${playerData.purchasedTitles.join('、 ')}\n`;
+    } else {
+        infoMsg += `已认证标识: 无\n`;
+    }
+
+
     infoMsg += `持有装备 (${playerData.heldWeapons ? playerData.heldWeapons.length : 0}):\n`;
     if (playerData.heldWeapons && playerData.heldWeapons.length > 0) {
         const weaponsData = getWeapons();
@@ -79,13 +90,18 @@ export async function handleShowHelp(e, pluginInstance) {
     const helpMsg = `--- 都市迷踪行动手册 ---\n` +
         `#进入地图 地图名/编号 武器 武器名 策略 策略名 - 前往指定异常区域进行探索。\n` +
         `  可选行动策略: ${VALID_STRATEGIES.join('、 ')}\n` +
-        `#查看商店 - 访问“黑市”查看可交易的装备。\n` +
+        `#退出队列 - 离开当前地图的待命队列。\n`+
+        `#查看队列 - 查看所有地图的待命人数。\n`+
+        `#查看商店 - 访问“黑市”查看可交易的装备与身份标识。\n` +
         `#购买武器 武器名称 - 从“黑市”采购指定装备。\n` +
+        `#购买称号 称号名称 - 从“黑市”认证新的身份标识。\n` +
+        `#装备称号 称号名称 / #装备称号 无 - 展示或卸下已认证的身份标识。\n` +
         `#出售物品 物品名称 - 将“收藏品”兑换为资金。\n` +
-        `#我的信息 - 查看个人资金、持有装备和收藏品。\n` +
+        `#我的信息 - 查看个人资金、装备、收藏品和身份标识。\n` +
         `#地图列表 - 显示所有已知的异常区域及其情报(附带编号)。\n` +
         `#武器列表 - 显示所有已记录的装备型号及其参数。\n` +
         `#排行榜 - 查看“资金”排行榜。\n` +
+        `#查看当前活动 - 获取最新的活动信息。\n` +
         `#搜打撤帮助 - 显示此行动手册。\n` +
         `#重载冒险数据 - (仅限“管理员”)强制刷新核心系统数据。`;
     e.reply(helpMsg);
@@ -109,7 +125,8 @@ export async function handleListMaps(e, pluginInstance) {
             `  建议威胁评估: ${map.limitCombatPower}\n` +
             `  调查小队上限: ${map.playerCapacity}人\n` +
             `  区域描述: ${map.description || '情报缺失'}\n` +
-            `  物资信号(参考): 普通(${Math.round((map.refreshRate?.['普通'] || 0) * 100)}%), 稀有(${Math.round((map.refreshRate?.['稀有'] || 0) * 100)}%), 罕见(${Math.round((map.refreshRate?.['罕见'] || 0) * 100)}%), 史诗(${Math.round((map.refreshRate?.['史诗'] || 0) * 100)}%), 传奇(${Math.round((map.refreshRate?.['传奇'] || 0) * 100)}%), 收藏品(${Math.round((map.refreshRate?.['收藏品'] || 0) * 100)}%)\n`;
+            `  物资信号(参考 - 地图私有池): 普通(${Math.round((map.refreshRate?.['普通'] || 0) * 100)}%), 稀有(${Math.round((map.refreshRate?.['稀有'] || 0) * 100)}%), 罕见(${Math.round((map.refreshRate?.['罕见'] || 0) * 100)}%), 史诗(${Math.round((map.refreshRate?.['史诗'] || 0) * 100)}%), 传奇(${Math.round((map.refreshRate?.['传奇'] || 0) * 100)}%), 收藏品(${Math.round((map.refreshRate?.['收藏品'] || 0) * 100)}%)\n` +
+            `  (注: 实际搜寻还会受到公共物品池影响)\n`;
     });
 
     if (global.Bot && global.Bot.makeForwardMsg) {
@@ -145,9 +162,10 @@ export async function handleListWeapons(e, pluginInstance) {
         weaponListMsg += `\n型号: ${w.name}\n` +
             `  稀有度: ${w.rarity || '标准'}\n` +
             `  基础威胁评估: ${w.baseCombatPower}\n` +
-            `  特性: ${w.passive || '无'}\n` +
-            `  “黑市”价格: ${w.price > 0 ? w.price + ' 资金' : '非卖品/初始装备'}\n` +
-            `  描述: ${w.description || '暂无公开描述'}\n`;
+            `  特性: ${w.passive || '无'} (类型: ${w.passiveType || 'none'})\n` + // 显示被动类型
+            `     效果: ${w.passiveDescription || w.description || '暂无详细描述'}\n` + // 显示被动描述
+            `  “黑市”价格: ${w.price > 0 ? w.price + ' 资金' : '非卖品/初始装备'}\n`;
+        // `  描述: ${w.description || '暂无公开描述'}\n`; // 可以合并到特性效果里
     });
 
     if (global.Bot && global.Bot.makeForwardMsg) {
@@ -176,6 +194,7 @@ export async function handleListWeapons(e, pluginInstance) {
 export async function handleShowLeaderboard(e, pluginInstance) {
     const allPlayersData = await getAllPlayerData();
     const allGameWeapons = getWeapons();
+    // const allGameTitles = getTitles(); // 如果需要显示称号效果，可以加载
 
     if (!allPlayersData || allPlayersData.length === 0) {
         return e.reply("“都市财富榜”暂无数据。");
@@ -192,19 +211,20 @@ export async function handleShowLeaderboard(e, pluginInstance) {
                     bestWeaponName = `${weaponName} (威胁评估 ${maxCombatPower})`;
                 }
             });
-            if (bestWeaponName === "无装备" && player.heldWeapons.includes("制式警棍")) {
+            if (bestWeaponName === "无装备" && player.heldWeapons.includes("制式警棍")) { // 确保制式警棍能正确显示
                 const defaultWeapon = allGameWeapons.find(w => w.name === "制式警棍");
                 if (defaultWeapon) bestWeaponName = `制式警棍 (威胁评估 ${defaultWeapon.baseCombatPower})`;
             }
         }
+        const displayedNickname = player.activeTitle ? `【${player.activeTitle}】 ${player.nickname}` : player.nickname;
         return {
-            nickname: player.nickname || `调查员${String(player.userId).slice(-4)}`,
+            nickname: displayedNickname || `调查员${String(player.userId).slice(-4)}`,
             userId: player.userId,
             funds: player.funds || 0,
             bestWeaponDisplay: bestWeaponName,
         };
     }).sort((a, b) => b.funds - a.funds)
-        .slice(0, 10);
+        .slice(0, 10); // 只显示前10名
 
     if (leaderboard.length === 0) {
         return e.reply("“都市财富榜”暂无有效数据。");
@@ -212,7 +232,7 @@ export async function handleShowLeaderboard(e, pluginInstance) {
 
     let leaderboardMsg = "--- 都市财富榜 Top 10 ---\n";
     leaderboard.forEach((player, index) => {
-        leaderboardMsg += `\n${index + 1}. ${player.nickname} (编号: ...${String(player.userId).slice(-4)})\n` +
+        leaderboardMsg += `\n${index + 1}. ${player.nickname} (编号: ...${String(player.userId).slice(-4)})\n` + // 确保 userId 正确显示
             `   资金: ${player.funds}\n` +
             `   最强装备: ${player.bestWeaponDisplay}\n`;
     });

@@ -32,3 +32,7 @@ export const DEFAULT_FALLBACK_ITEM_NAME = "应急口粮棒";
 
 // 初始武器名称 (不可出售、不可被夺走)
 export const INITIAL_WEAPON_NAME = "制式警棍";
+
+export const QUEUE_CHECK_INTERVAL = 60 * 1000; // 单位是毫秒，这里代表60秒（1分钟）
+
+export const DEFAULT_NPC_FILL_DELAY_MINUTES = 5;

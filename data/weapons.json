@@ -4,22 +4,30 @@
     "price": 0,
     "baseCombatPower": 50,
     "passive": "无",
+    "passiveType": "none",
+    "passiveDescription": "标准制式装备，无特殊机能。",
     "rarity": "普通",
-    "description": "都市治安维持部队的标准化装备，可靠但平庸。"
+    "description": "都市治安维持部队的标准化装备，可靠但平庸。新手必备，无法被夺走或出售。"
   },
   {
     "name": "撕裂者手斧",
     "price": 7000,
     "baseCombatPower": 120,
     "passive": "破片效应",
+    "passiveType": "power_boost_percentage",
+    "passiveValue": 0.15,
+    "passiveDescription": "攻击时能造成额外的撕裂伤，提升15%基础威胁评估。",
     "rarity": "稀有",
-    "description": "经过粗糙改造的消防斧，攻击时能造成额外的撕裂伤。"
+    "description": "经过粗糙改造的消防斧。"
   },
   {
     "name": "过载充能枪",
     "price": 4000,
     "baseCombatPower": 200,
     "passive": "不稳定输出",
+    "passiveType": "conditional_power_boost_or_debuff",
+    "passiveValue": {"boost": 0.3, "debuff": -0.2, "condition_threshold_multiplier": 0.75, "debuff_chance": 0.1},
+    "passiveDescription": "若目标威胁评估高于自身75%，则威力激增30%；否则有10%几率失控反噬，威力降低20%。",
     "rarity": "史诗",
     "description": "一把实验性的能量武器，威力巨大，但有失控的风险。"
   },
@@ -28,14 +36,20 @@
     "price": 6000,
     "baseCombatPower": 100,
     "passive": "精准校准",
+    "passiveType": "power_boost_percentage",
+    "passiveValue": 0.12,
+    "passiveDescription": "高级瞄准模块显著提升了命中关键部位的几率，提升12%基础威胁评估。",
     "rarity": "稀有",
-    "description": "加装了高级瞄准模块的手枪，显著提升了命中率。"
+    "description": "加装了高级瞄准模块的手枪。"
   },
   {
     "name": "迷茫瓦斯榴弹",
     "price": 10000,
-    "baseCombatPower": 150,
+    "baseCombatPower": 80,
     "passive": "认知干扰",
+    "passiveType": "target_power_debuff_percentage",
+    "passiveValue": 0.15,
+    "passiveDescription": "释放特殊瓦斯干扰目标感官与判断力，使其威胁评估临时降低15%。基础威胁评估较低，依赖特性。",
     "rarity": "罕见",
     "description": "释放出能干扰目标感官与判断力的特殊瓦斯。"
   },
@@ -44,6 +58,9 @@
     "price": 15000,
     "baseCombatPower": 80,
     "passive": "偏折力场",
+    "passiveType": "power_boost_percentage_defense_only",
+    "passiveValue": 0.20,
+    "passiveDescription": "能短时间生成小型偏折力场，作为防守方时，等效威胁评估提升20%。",
     "rarity": "罕见",
     "description": "能短时间生成小型偏折力场，抵御攻击。"
   },
@@ -52,15 +69,118 @@
     "price": 25000,
     "baseCombatPower": 180,
     "passive": "异界低语",
+    "passiveType": "power_boost_percentage",
+    "passiveValue": 0.22,
+    "passiveDescription": "引导出不可名状的力量，提升22%基础威胁评估，但也可能带来未知风险(暂未实现)。",
     "rarity": "史诗",
-    "description": "一本记录着禁忌知识的书籍，翻阅者能引导出不可名状的力量，但也可能被其反噬。"
+    "description": "一本记录着禁忌知识的书籍。"
   },
   {
     "name": "薄瞑",
     "price": 500000,
-    "baseCombatPower": 1000,
-    "passive": "存在抹消（概率）",
+    "baseCombatPower": 350,
+    "passive": "存在抹消",
+    "passiveType": "direct_success_rate_modifier_conditional",
+    "passiveValue": {"rate_modifier": 1.0, "trigger_chance": 0.05},
+    "passiveDescription": "有5%的极低概率直接抹消目标的存在，无视战力差，强制战斗胜利；未触发时，锋刃依旧致命。",
     "rarity": "传奇",
     "description": "一把散发着不祥气息的黑色长刃，传说被其斩杀者将彻底消失于所有记录与记忆之中。"
+  },
+  {
+    "name": "“血怒”战斧",
+    "price": 18000,
+    "baseCombatPower": 150,
+    "passive": "愈战愈勇",
+    "passiveType": "power_boost_if_self_wounded",
+    "passiveValue": 0.30,
+    "passiveDescription": "当自身处于负伤状态时，激发狂怒，基础威胁评估提升30%。",
+    "rarity": "罕见",
+    "description": "沾染了无数鲜血的战斧，在使用者受伤时会发出嗜血的渴望。"
+  },
+  {
+    "name": "“猎手”义眼",
+    "price": 22000,
+    "baseCombatPower": 70,
+    "passive": "弱点洞察",
+    "passiveType": "power_boost_if_target_wounded",
+    "passiveValue": 0.35,
+    "passiveDescription": "如果目标已负伤，能精准锁定其弱点进行打击，基础威胁评估提升35%。",
+    "rarity": "史诗",
+    "description": "高级义眼，能分析并高亮显示目标的结构弱点。"
+  },
+  {
+    "name": "“不屈”核心",
+    "price": 30000,
+    "baseCombatPower": 100,
+    "passive": "无视损伤",
+    "passiveType": "ignore_self_wounded_status",
+    "passiveDescription": "核心内置的应急系统能让你在负伤时依旧保持标准战斗出力，不会受到负伤的战力惩罚。",
+    "rarity": "史诗",
+    "description": "一种特殊的植入体核心，能极大增强使用者的韧性。"
+  },
+  {
+    "name": "“诡诈”匕首",
+    "price": 28000,
+    "baseCombatPower": 90,
+    "passive": "逆转乾坤",
+    "passiveType": "direct_success_rate_modifier",
+    "passiveValue": 0.15,
+    "passiveDescription": "通过出其不意的攻击，直接提升15%的战斗成功率，无视部分战力差距。",
+    "rarity": "史诗",
+    "description": "一把淬有特殊神经毒素的匕首，总能找到意想不到的攻击角度。"
+  },
+  {
+    "name": "“幽灵”披风",
+    "price": 16000,
+    "baseCombatPower": 20,
+    "passive": "紧急脱离",
+    "passiveType": "escape_boost_post_combat",
+    "passiveValue": 0.25,
+    "passiveDescription": "在战斗失利后，有额外25%的几率成功脱离（包括无伤或受伤状态）。",
+    "rarity": "罕见",
+    "description": "采用光学迷彩材料制成的披风，能辅助使用者在混乱中撤退。"
+  },
+  {
+    "name": "“求生者”工具包",
+    "price": 13000,
+    "baseCombatPower": 30,
+    "passive": "顽强意志",
+    "passiveType": "post_combat_ignore_wound",
+    "passiveDescription": "即使战斗失利，也有极大可能仅受轻伤或避免进入“负伤”状态，从而保留物资。",
+    "rarity": "罕见",
+    "description": "包含各种应急物资和简易修复工具，提升了恶劣环境下的生存能力。"
+  },
+  {
+    "name": "血色长镰",
+    "price": 0,
+    "baseCombatPower": 170,
+    "passive": "猩红渴望",
+    "passiveType": "power_boost_if_target_wounded",
+    "passiveValue": 0.3,
+    "passiveDescription": "若目标已负伤，此武器造成的威胁额外提升30%。",
+    "rarity": "史诗",
+    "description": "一把渴望鲜血的长镰，在敌人虚弱时更为致命。由【殷红迷雾】卡利持有。"
+  },
+  {
+    "name": "改装冲击钻",
+    "price": 0,
+    "baseCombatPower": 110,
+    "passive": "破甲一击",
+    "passiveType": "target_debuff_on_hit_chance",
+    "passiveValue": {"debuffEffect": "reduce_power_percentage", "debuffAmount": 0.1, "chance": 0.4},
+    "passiveDescription": "攻击命中时有40%几率破坏目标部分装甲，使其后续受到的伤害增加（目标临时战力降低10%）。",
+    "rarity": "稀有",
+    "description": "街头巷战的粗犷改装，专治各种不服。由【街边收尾人】杰克持有。"
+  },
+  {
+    "name": "制式脉冲步枪",
+    "price": 0,
+    "baseCombatPower": 140,
+    "passive": "连发射击",
+    "passiveType": "multi_hit_chance",
+    "passiveValue": {"extra_hits": 1, "chance_per_hit": 0.3, "damage_modifier_per_hit": 0.5},
+    "passiveDescription": "有30%的几率进行一次额外的追击射击（造成50%基础伤害）。",
+    "rarity": "稀有",
+    "description": "标准化的区域控制武器，性能稳定。由哨兵7号持有。"
   }
 ]

@@ -3,84 +3,133 @@
     "name": "应急口粮棒",
     "price": 10,
     "rarity": "普通",
+    "type": "item",
     "description": "维持基本生理需求的压缩食品，味道和包装一样乏善可陈。"
   },
   {
     "name": "损坏的义体零件",
     "price": 15,
     "rarity": "普通",
+    "type": "item",
     "description": "来源不明的义体部件，布满划痕，似乎经历过激烈的冲突。"
   },
   {
     "name": "“安定”注射剂",
     "price": 30,
     "rarity": "普通",
+    "type": "item",
     "description": "短效精神稳定剂，能暂时压制恐慌，但有轻微的认知模糊副作用。"
   },
   {
     "name": "加密数据盘",
     "price": 40,
     "rarity": "稀有",
+    "type": "item",
     "description": "一块无法直接读取的数据盘，表面覆盖着复杂的加密纹路。"
   },
   {
     "name": "“呢喃”石块",
     "price": 80,
     "rarity": "稀有",
+    "type": "item",
     "description": "握在手中时能听到微弱、无法理解的低语，来源不明。"
   },
   {
     "name": "认知滤镜碎片",
     "price": 150,
     "rarity": "罕见",
+    "type": "item",
     "description": "一种能扭曲或修正感官输入的装置残片，效果未知。"
   },
   {
     "name": "“代价”契约残页",
     "price": 280,
     "rarity": "罕见",
+    "type": "item",
     "description": "某种古老契约的一部分，上面用无法解读的文字书写着索取与给予的条款。"
   },
   {
     "name": "“观测者”之眼",
     "price": 900,
     "rarity": "史诗",
+    "type": "item",
     "description": "一颗冰冷的机械义眼，据说能洞察常人无法感知的“真实”。"
   },
   {
     "name": "扭曲核心样本",
     "price": 1300,
     "rarity": "史诗",
+    "type": "item",
     "description": "从某个“异常”现象中心提取的物质，其物理性质极不稳定。"
   },
   {
     "name": "“图书馆”入场券",
     "price": 4000,
     "rarity": "传奇",
+    "type": "item",
     "description": "一张散发着微光的卡片，上面写着“欢迎来到图书馆，寻找属于你的书吧”。"
   },
   {
     "name": "“都市之星”碎片",
     "price": 7000,
     "rarity": "传奇",
+    "type": "item",
     "description": "传说中支撑着这座无尽都市运转的“星”的微小残片，蕴含着难以想象的力量。"
   },
   {
     "name": "空白书页",
     "price": 16000,
     "rarity": "收藏品",
+    "type": "collectible",
     "description": "一张看似普通的空白书页，但在特定条件下似乎能显现出文字。"
   },
   {
     "name": "破损的邀请函",
     "price": 18000,
     "rarity": "收藏品",
+    "type": "collectible",
     "description": "一封发出者不明的邀请函，目的地被污渍掩盖，只留下“禁忌区域”的字样。"
   },
   {
     "name": "“回响”调音叉",
     "price": 23000,
     "rarity": "收藏品",
+    "type": "collectible",
     "description": "敲击时会发出能引起周围环境异常共鸣的声波，用途不明。"
+  },
+  {
+    "name": "干涸的血晶",
+    "price": 300,
+    "rarity": "罕见",
+    "type": "collectible",
+    "description": "从【殷红迷雾】卡利身上掉落的奇异晶体，似乎蕴含着凝固的生命力。"
+  },
+  {
+    "name": "迷雾核心",
+    "price": 1200,
+    "rarity": "史诗",
+    "type": "collectible",
+    "description": "【殷红迷雾】卡利的力量之源，散发着不祥的红色光芒。"
+  },
+  {
+    "name": "一袋可疑零件",
+    "price": 50,
+    "rarity": "普通",
+    "type": "collectible",
+    "description": "从【街边收尾人】杰克处获得的零件，用途不明，但或许能在黑市卖点小钱。"
+  },
+  {
+    "name": "黑市通行证（伪）",
+    "price": 250,
+    "rarity": "稀有",
+    "type": "collectible",
+    "description": "一张伪造的黑市通行证，做工粗糙，但或许能唬住一些守卫。"
+  },
+  {
+    "name": "损坏的哨兵核心",
+    "price": 400,
+    "rarity": "罕见",
+    "type": "collectible",
+    "description": "来自被摧毁的哨兵7号，核心部件已损坏，但仍有研究价值。"
   }
 ]

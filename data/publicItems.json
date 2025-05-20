@@ -1,0 +1,49 @@
+[
+  {
+    "name": "标准能量单元",
+    "price": 25,
+    "rarity": "普通",
+    "type": "item",
+    "description": "一块标准规格的能量电池，用途广泛。"
+  },
+  {
+    "name": "急救喷雾剂",
+    "price": 35,
+    "rarity": "普通",
+    "type": "item",
+    "description": "能快速处理轻微伤口的医疗喷雾。"
+  },
+  {
+    "name": "废弃的芯片组",
+    "price": 50,
+    "rarity": "稀有",
+    "type": "item",
+    "description": "一组来源不明的旧式芯片，或许还能提取出一些有用的数据。"
+  },
+  {
+    "name": "万能工具组",
+    "price": 120,
+    "rarity": "稀有",
+    "type": "item",
+    "description": "包含多种常用工具的组合包，应对突发状况的利器。"
+  },
+  {
+    "name": "“幽影”干扰器 (原型)",
+    "price": 0,
+    "baseCombatPower": 0,
+    "passive": "短暂隐匿",
+    "passiveType": "evasion_boost_post_combat",
+    "passiveValue": 0.20,
+    "passiveDescription": "战斗失利后，有20%额外几率无伤或轻伤脱离。",
+    "rarity": "罕见",
+    "type": "weapon",
+    "description": "一个实验性的干扰装置，能在短时间内扭曲使用者的光学信号，辅助撤退。"
+  },
+  {
+    "name": "“洞察”辅助目镜 (损坏)",
+    "price": 20000,
+    "rarity": "罕见",
+    "type": "collectible",
+    "description": "一个损坏的战术目镜，核心功能缺失，但其精密结构仍有收藏价值。"
+  }
+]

@@ -1,0 +1,108 @@
+[
+  {
+    "id": "npc_kalix_mistweaver",
+    "name": "卡利",
+    "title": "殷红迷雾",
+    "hostility": "hostile",
+    "baseCombatPower": 180,
+    "weapon": {
+      "name": "血色长镰",
+      "baseCombatPower": 170,
+      "passive": "猩红渴望",
+      "passiveType": "power_boost_if_target_wounded",
+      "passiveValue": 0.3,
+      "passiveDescription": "若目标已负伤，此武器造成的威胁额外提升30%。",
+      "rarity": "史诗",
+      "description": "一把渴望鲜血的长镰，在敌人虚弱时更为致命。"
+    },
+    "uniqueLoot": [
+      { "type": "collectible", "name": "干涸的血晶", "dropChance": 0.5, "rarity": "罕见", "price": 300 },
+      { "type": "collectible", "name": "迷雾核心", "dropChance": 0.2, "rarity": "史诗", "price": 1200 },
+      { "type": "weapon", "name": "血色长镰", "dropChance": 0.05 }
+    ],
+    "combatPassive": {
+      "type": "suppression",
+      "name": "恐惧压制",
+      "description": "【恐惧压制】卡利的攻击使对手感到恐惧。若对手的基础战力低于卡利，其最终战斗成功率不会高于40%。",
+      "details": {
+        "maxSuccessRateForOpponent": 0.40
+      }
+    },
+    "dialogue": {
+      "onEncounter": "又一个迷途的羔羊，将在迷雾中消散...",
+      "onDefeat": "迷雾...尚未...散去..."
+    }
+  },
+  {
+    "id": "npc_jack_fixer",
+    "name": "杰克",
+    "title": "街边收尾人",
+    "hostility": "neutral",
+    "baseCombatPower": 120,
+    "weapon": {
+      "name": "改装冲击钻",
+      "baseCombatPower": 110,
+      "passive": "破甲一击",
+      "passiveType": "target_debuff_on_hit_chance",
+      "passiveValue": {"debuffEffect": "reduce_power_percentage", "debuffAmount": 0.15, "chance": 0.4},
+      "passiveDescription": "攻击命中时有40%几率破坏目标部分装甲，使其威胁评估临时降低15%。",
+      "rarity": "稀有",
+      "description": "街头巷战的粗犷改装，专治各种不服。"
+    },
+    "uniqueLoot": [
+      { "type": "collectible", "name": "一袋可疑零件", "dropChance": 0.6, "rarity": "普通", "price": 50 },
+      { "type": "collectible", "name": "黑市通行证（伪）", "dropChance": 0.3, "rarity": "稀有", "price": 250 },
+      { "type": "weapon", "name": "改装冲击钻", "dropChance": 0.1 }
+    ],
+    "combatPassive": {
+      "type": "master_escape",
+      "name": "逃跑大师",
+      "description": "【逃跑大师】杰克总能找到脱身的机会。若战局不利（自身战力远低于对手），将有极高概率直接脱离战斗。",
+      "details": {
+        "escapeChance": 0.90,
+        "condition": "self_power_much_lower",
+        "powerRatioThreshold": 0.6
+      }
+    },
+    "dialogue": {
+      "onEncounter": "嘿，小子。找麻烦？还是想“修理”点什么？",
+      "onDefeat": "可恶...算你狠...这笔账我记下了！",
+      "onEscape": "哈，想抓我？下辈子吧！"
+    }
+  },
+  {
+    "id": "npc_sentinel_unit_7",
+    "name": "哨兵7号",
+    "title": "区域巡逻者",
+    "hostility": "hostile",
+    "baseCombatPower": 150,
+    "weapon": {
+      "name": "制式脉冲步枪（哨兵型）",
+      "baseCombatPower": 140,
+      "passive": "精确点射",
+      "passiveType": "critical_hit_success_boost",
+      "passiveValue": {"successRateBonus": 0.10},
+      "passiveDescription": "连续的精确射击更容易抓住敌方破绽，直接提升10%的最终战斗成功概率。",
+      "rarity": "稀有",
+      "description": "标准化的区域控制武器，哨兵7号特化型号，注重单点突破。"
+    },
+    "uniqueLoot": [
+      { "type": "item", "name": "标准能量单元", "dropChance": 0.7, "rarity": "普通", "price": 25},
+      { "type": "collectible", "name": "损坏的哨兵核心", "dropChance": 0.25, "rarity": "罕见", "price": 400},
+      { "type": "weapon", "name": "制式脉冲步枪（哨兵型）", "dropChance": 0.03 }
+    ],
+    "combatPassive": {
+      "type": "power_surge_on_engage",
+      "name": "过载核心",
+      "description": "【过载核心】哨兵7号在进入战斗时会短时间过载其核心，无论是主动攻击还是被动防御，其基础威胁评估都会提升40点。",
+      "details": {
+        "powerBoost": 40
+      }
+    },
+    "dialogue": {
+      "onEncounter": "侦测到未授权单位...威胁等级评估中...执行清除协议...",
+      "onDefeat": "系统...机能...停止...错误...错误...",
+      "onEngage": "目标锁定，开始压制！"
+    }
+  }
+]
