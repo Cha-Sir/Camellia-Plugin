@@ -1,0 +1,16 @@
+{
+  "userId": "1418763489",
+  "nickname": "茶色",
+  "funds": 1000,
+  "heldWeapons": [
+    "新手太刀",
+    "太刀"
+  ],
+  "collectibles": [
+    {
+      "name": "迷之金币",
+      "price": 200,
+      "rarity": "收藏品"
+    }
+  ]
+}

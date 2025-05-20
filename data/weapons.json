@@ -1,0 +1,9 @@
+[
+  {"name": "新手太刀", "price": 0, "baseCombatPower": 50, "passive": "无"},
+  {"name": "太刀", "price": 500, "baseCombatPower": 120, "passive": "锋利"},
+  {"name": "精钢太刀", "price": 1500, "baseCombatPower": 200, "passive": "破甲"},
+  {"name": "猎弓", "price": 400, "baseCombatPower": 100, "passive": "精准射击"},
+  {"name": "附魔匕首", "price": 800, "baseCombatPower": 150, "passive": "淬毒"},
+  {"name": "守护者之盾", "price": 1200, "baseCombatPower": 80, "passive": "格挡反击"},
+  {"name": "元素法杖", "price": 2000, "baseCombatPower": 180, "passive": "元素增幅"}
+]
