@@ -1,9 +1,66 @@
 [
-  {"name": "新手太刀", "price": 0, "baseCombatPower": 50, "passive": "无"},
-  {"name": "太刀", "price": 500, "baseCombatPower": 120, "passive": "锋利"},
-  {"name": "精钢太刀", "price": 1500, "baseCombatPower": 200, "passive": "破甲"},
-  {"name": "猎弓", "price": 400, "baseCombatPower": 100, "passive": "精准射击"},
-  {"name": "附魔匕首", "price": 800, "baseCombatPower": 150, "passive": "淬毒"},
-  {"name": "守护者之盾", "price": 1200, "baseCombatPower": 80, "passive": "格挡反击"},
-  {"name": "元素法杖", "price": 2000, "baseCombatPower": 180, "passive": "元素增幅"}
+  {
+    "name": "制式警棍",
+    "price": 0,
+    "baseCombatPower": 50,
+    "passive": "无",
+    "rarity": "普通",
+    "description": "都市治安维持部队的标准化装备，可靠但平庸。"
+  },
+  {
+    "name": "撕裂者手斧",
+    "price": 7000,
+    "baseCombatPower": 120,
+    "passive": "破片效应",
+    "rarity": "稀有",
+    "description": "经过粗糙改造的消防斧，攻击时能造成额外的撕裂伤。"
+  },
+  {
+    "name": "过载充能枪",
+    "price": 4000,
+    "baseCombatPower": 200,
+    "passive": "不稳定输出",
+    "rarity": "史诗",
+    "description": "一把实验性的能量武器，威力巨大，但有失控的风险。"
+  },
+  {
+    "name": "鹰眼改装手枪",
+    "price": 6000,
+    "baseCombatPower": 100,
+    "passive": "精准校准",
+    "rarity": "稀有",
+    "description": "加装了高级瞄准模块的手枪，显著提升了命中率。"
+  },
+  {
+    "name": "迷茫瓦斯榴弹",
+    "price": 10000,
+    "baseCombatPower": 150,
+    "passive": "认知干扰",
+    "rarity": "罕见",
+    "description": "释放出能干扰目标感官与判断力的特殊瓦斯。"
+  },
+  {
+    "name": "守护力场手套",
+    "price": 15000,
+    "baseCombatPower": 80,
+    "passive": "偏折力场",
+    "rarity": "罕见",
+    "description": "能短时间生成小型偏折力场，抵御攻击。"
+  },
+  {
+    "name": "低语法术书",
+    "price": 25000,
+    "baseCombatPower": 180,
+    "passive": "异界低语",
+    "rarity": "史诗",
+    "description": "一本记录着禁忌知识的书籍，翻阅者能引导出不可名状的力量，但也可能被其反噬。"
+  },
+  {
+    "name": "薄瞑",
+    "price": 500000,
+    "baseCombatPower": 1000,
+    "passive": "存在抹消（概率）",
+    "rarity": "传奇",
+    "description": "一把散发着不祥气息的黑色长刃，传说被其斩杀者将彻底消失于所有记录与记忆之中。"
+  }
 ]
