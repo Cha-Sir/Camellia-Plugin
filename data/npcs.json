@@ -7,7 +7,7 @@
     "baseCombatPower": 180,
     "weapon": {
       "name": "血色长镰",
-      "baseCombatPower": 170,
+      "baseCombatPower": 270,
       "passive": "猩红渴望",
       "passiveType": "power_boost_if_target_wounded",
       "passiveValue": 0.3,

@@ -78,7 +78,7 @@
   {
     "name": "薄瞑",
     "price": 500000,
-    "baseCombatPower": 350,
+    "baseCombatPower": 650,
     "passive": "存在抹消",
     "passiveType": "direct_success_rate_modifier_conditional",
     "passiveValue": {"rate_modifier": 1.0, "trigger_chance": 0.05},

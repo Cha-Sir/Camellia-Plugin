@@ -133,5 +133,31 @@
     "availableNpcIds": ["npc_kalix_mistweaver"],
     "npcFillDelayMinutes": 1,
     "description": "系统管理员用于调试各项参数的虚拟空间，现象极不稳定。"
-  }
+  },{
+  "name": "测试大坝",
+  "entryFee": 0,
+  "limitCombatPower": 0,
+  "playerCapacity": 2,
+  "itemPool": {
+    "普通": ["损坏的义体零件", "应急口粮棒", {"name": "制式警棍", "type": "weapon"}],
+    "稀有": ["加密数据盘", "“呢喃”石块", {"name": "“鹰眼”改装手枪", "type": "weapon"}],
+    "罕见": ["认知滤镜碎片", "“代价”契约残页"],
+    "史诗": [{"name": "“撕裂者”手斧", "type": "weapon"}],
+    "传奇": [],
+    "收藏品": ["空白书页"]
+  },
+  "refreshRate": {
+    "普通": 0.42,
+    "稀有": 0.47,
+    "罕见": 0.16,
+    "史诗": 0.06,
+    "传奇": 0.01,
+    "收藏品": 0.01
+  },
+  "npcSpawnChance": 0.3,
+  "maxNpcsToSpawn": 5,
+  "availableNpcIds": ["npc_jack_fixer"],
+  "npcFillDelayMinutes": 5,
+  "description": "曾经是繁华的都市下层聚居区，如今已被遗弃，只有扭曲的金属结构和若有若无的低语在回荡。"
+}
 ]
