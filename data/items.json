@@ -99,36 +99,36 @@
   },
   {
     "name": "干涸的血晶",
-    "price": 300,
-    "rarity": "罕见",
+    "price": 30000,
+    "rarity": "收藏品",
     "type": "collectible",
     "description": "从【殷红迷雾】卡利身上掉落的奇异晶体，似乎蕴含着凝固的生命力。"
   },
   {
     "name": "迷雾核心",
-    "price": 1200,
-    "rarity": "史诗",
+    "price": 12000,
+    "rarity": "收藏品",
     "type": "collectible",
     "description": "【殷红迷雾】卡利的力量之源，散发着不祥的红色光芒。"
   },
   {
     "name": "一袋可疑零件",
-    "price": 50,
-    "rarity": "普通",
+    "price": 5000,
+    "rarity": "收藏品",
     "type": "collectible",
     "description": "从【街边收尾人】杰克处获得的零件，用途不明，但或许能在黑市卖点小钱。"
   },
   {
     "name": "黑市通行证（伪）",
-    "price": 250,
-    "rarity": "稀有",
+    "price": 25000,
+    "rarity": "收藏品",
     "type": "collectible",
     "description": "一张伪造的黑市通行证，做工粗糙，但或许能唬住一些守卫。"
   },
   {
     "name": "损坏的哨兵核心",
-    "price": 400,
-    "rarity": "罕见",
+    "price": 40000,
+    "rarity": "收藏品",
     "type": "collectible",
     "description": "来自被摧毁的哨兵7号，核心部件已损坏，但仍有研究价值。"
   }
