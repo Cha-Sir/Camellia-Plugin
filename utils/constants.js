@@ -36,3 +36,10 @@ export const INITIAL_WEAPON_NAME = "制式警棍";
 export const QUEUE_CHECK_INTERVAL = 60 * 1000; // 单位是毫秒，这里代表60秒（1分钟）
 
 export const DEFAULT_NPC_FILL_DELAY_MINUTES = 5;
+
+export const INJURY_LEVELS = {
+    light: { name: '轻伤', cost: 50 },
+    medium: { name: '一般伤', cost: 150 },
+    heavy: { name: '重伤', cost: 300 },
+    none: { name: '无伤', cost: 0 }
+};

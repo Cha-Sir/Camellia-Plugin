@@ -22,7 +22,7 @@
     },
     "npcSpawnChance": 0.3,
     "maxNpcsToSpawn": 5,
-    "availableNpcIds": ["npc_jack_fixer"],
+    "availableNpcIds": ["npc_jack_fixer","npc_1"],
     "npcFillDelayMinutes": 5,
     "description": "曾经是繁华的都市下层聚居区，如今已被遗弃，只有扭曲的金属结构和若有若无的低语在回荡。"
   },
@@ -76,7 +76,7 @@
     },
     "npcSpawnChance": 0.5,
     "maxNpcsToSpawn": 3,
-    "availableNpcIds": ["npc_kalix_mistweaver"],
+    "availableNpcIds": ["npc_kalix_mistweaver","npc_1"],
     "npcFillDelayMinutes": 4,
     "description": "由于未知“异常”泄露导致感官与认知极易受到干扰的区域，深入其中需要极大的意志力。"
   },
@@ -103,7 +103,7 @@
     },
     "npcSpawnChance": 0.4,
     "maxNpcsToSpawn": 2,
-    "availableNpcIds": ["npc_sentinel_unit_7", "npc_jack_fixer"],
+    "availableNpcIds": ["npc_sentinel_unit_7", "npc_jack_fixer","npc_1"],
     "npcFillDelayMinutes": 6,
     "description": "传说中收容着世间所有知识与故事的“图书馆”的边缘地带，徘徊着寻求知识的“访客”与守护秘密的“司书”。"
   },
@@ -156,7 +156,7 @@
   },
   "npcSpawnChance": 0.3,
   "maxNpcsToSpawn": 5,
-  "availableNpcIds": ["npc_jack_fixer"],
+  "availableNpcIds": ["npc_1"],
   "npcFillDelayMinutes": 5,
   "description": "曾经是繁华的都市下层聚居区，如今已被遗弃，只有扭曲的金属结构和若有若无的低语在回荡。"
 }

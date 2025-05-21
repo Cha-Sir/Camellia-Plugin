@@ -104,5 +104,33 @@
       "onDefeat": "系统...机能...停止...错误...错误...",
       "onEngage": "目标锁定，开始压制！"
     }
+  },
+  {
+    "id": "npc_1",
+    "name": "无名收尾人耗子",
+    "title": "耗子",
+    "hostility": "hostile",
+    "baseCombatPower": 50,
+    "weapon": {
+      "name": "流放者砍刀",
+      "baseCombatPower": 50,
+      "passive": "无",
+      "passiveType": "none",
+      "passiveDescription": "标准装备，无特殊机能。",
+      "rarity": "普通",
+      "description": "一把破旧的砍刀。"
+    },
+    "uniqueLoot": [
+      { "type": "item", "name": "耗子内脏", "dropChance": 0.7, "rarity": "稀有", "price": 55},
+      { "type": "collectible", "name": "后巷通行证", "dropChance": 0.01, "rarity": "收藏品", "price": 40000},
+      { "type": "weapon", "name": "流放者砍刀", "dropChance": 0.5}
+    ],
+    "combatPassive": {
+    },
+    "dialogue": {
+      "onEncounter": "内脏……",
+      "onDefeat": "不要，挖走，我的……",
+      "onEngage": "就拿你开刀吧！"
+    }
   }
 ]

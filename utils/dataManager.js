@@ -29,7 +29,7 @@ const MAP_FILE = path.join(pluginDataDir, 'maps.json');
 const PUBLIC_ITEM_FILE = path.join(pluginDataDir, 'publicItems.json');
 const TITLE_FILE = path.join(pluginDataDir, 'titles.json');
 const ACTIVITY_TEXT_FILE = path.join(pluginDataDir, 'currentActivity.txt');
-const NPC_FILE = path.join(pluginDataDir, 'npcs.json'); // NPC 数据文件
+const NPC_FILE = path.join(pluginDataDir, 'npcs.json');
 
 let itemsData = [];
 let weaponsData = [];
@@ -37,7 +37,7 @@ let mapsData = [];
 let publicItemsData = [];
 let titlesData = [];
 let currentActivityText = "";
-let npcsData = []; // 存储NPC数据
+let npcsData = [];
 
 /**
  * 加载所有基础游戏数据.
@@ -50,7 +50,7 @@ async function loadAllBaseData() {
         mapsData = await fs.readJson(MAP_FILE, { throws: false }) || [];
         publicItemsData = await fs.readJson(PUBLIC_ITEM_FILE, { throws: false }) || [];
         titlesData = await fs.readJson(TITLE_FILE, { throws: false }) || [];
-        npcsData = await fs.readJson(NPC_FILE, { throws: false }) || []; // 加载NPC数据
+        npcsData = await fs.readJson(NPC_FILE, { throws: false }) || [];
 
         if (await fs.pathExists(ACTIVITY_TEXT_FILE)) {
             currentActivityText = await fs.readFile(ACTIVITY_TEXT_FILE, 'utf-8');
@@ -69,8 +69,6 @@ async function loadAllBaseData() {
         if (titlesData.length === 0) currentLogger.info('[AdventureGame/DataManager] 提示: titles.json 为空或加载失败。');
         if (npcsData.length === 0) currentLogger.warn('[AdventureGame/DataManager] 警告: npcs.json 为空或加载失败 (NPC系统可能无法正常运作)。');
 
-
-        // 确保初始武器定义
         let initialWeapon = weaponsData.find(w => w.name === INITIAL_WEAPON_NAME);
         if (!initialWeapon) {
             weaponsData.push({
@@ -84,7 +82,6 @@ async function loadAllBaseData() {
             if (!initialWeapon.passiveType) initialWeapon.passiveType = "none";
         }
 
-        // 确保所有武器都有稀有度和被动类型
         weaponsData.forEach(weapon => {
             if (!weapon.rarity) weapon.rarity = "普通";
             if (!weapon.passiveType) weapon.passiveType = "none";
@@ -102,25 +99,14 @@ async function loadAllBaseData() {
     }
 }
 
-/** 获取所有物品数据 */
 function getItems() { return itemsData; }
-/** 获取所有武器数据 */
 function getWeapons() { return weaponsData; }
-/** 获取所有地图数据 */
 function getMaps() { return mapsData; }
-/** 获取公共物品池数据 */
 function getPublicItems() { return publicItemsData; }
-/** 获取所有称号数据 */
 function getTitles() { return titlesData; }
-/** 获取当前活动文本 */
 function getCurrentActivityText() { return currentActivityText; }
-/** 获取所有NPC数据 */
 function getNpcs() { return npcsData; }
 
-
-/**
- * 获取玩家数据。如果玩家不存在，则创建新玩家档案。
- */
 async function getPlayerData(userId, nickname = '') {
     const playerFile = path.join(playersDir, `${userId}.json`);
     let loadedPlayerData = null;
@@ -143,9 +129,12 @@ async function getPlayerData(userId, nickname = '') {
             heldWeapons: [INITIAL_WEAPON_NAME],
             collectibles: [],
             purchasedTitles: [],
-            activeTitle: ""
+            activeTitle: "",
+            // 新增伤病状态字段
+            permanentInjuryStatus: 'none', // 'none', 'light', 'medium', 'heavy' (对应中文：无伤，轻伤，一般伤，重伤)
+            needsTreatment: false
         };
-        if (weaponsData.length === 0) await loadAllBaseData(); // 确保基础数据已加载
+        if (weaponsData.length === 0) await loadAllBaseData();
 
         const saveSuccess = await savePlayerData(userId, finalPlayerData);
         if (saveSuccess) {
@@ -155,7 +144,6 @@ async function getPlayerData(userId, nickname = '') {
         }
     } else {
         finalPlayerData = loadedPlayerData;
-        // 确保老玩家档案的完整性
         if (!finalPlayerData.heldWeapons) finalPlayerData.heldWeapons = [];
         if (!finalPlayerData.heldWeapons.includes(INITIAL_WEAPON_NAME)) {
             finalPlayerData.heldWeapons.push(INITIAL_WEAPON_NAME);
@@ -164,6 +152,10 @@ async function getPlayerData(userId, nickname = '') {
         if (!finalPlayerData.collectibles) finalPlayerData.collectibles = [];
         if (!finalPlayerData.purchasedTitles) finalPlayerData.purchasedTitles = [];
         if (typeof finalPlayerData.activeTitle === 'undefined') finalPlayerData.activeTitle = "";
+        // 初始化新字段（如果老玩家数据中没有）
+        if (typeof finalPlayerData.permanentInjuryStatus === 'undefined') finalPlayerData.permanentInjuryStatus = 'none';
+        if (typeof finalPlayerData.needsTreatment === 'undefined') finalPlayerData.needsTreatment = false;
+
 
         if (nickname && finalPlayerData.nickname !== nickname) {
             finalPlayerData.nickname = nickname;
@@ -175,9 +167,6 @@ async function getPlayerData(userId, nickname = '') {
     return { playerData: finalPlayerData, isNewPlayer };
 }
 
-/**
- * 保存玩家数据到JSON文件。
- */
 async function savePlayerData(userId, data) {
     const playerFile = path.join(playersDir, `${userId}.json`);
     const currentLogger = global.logger || console;
@@ -191,9 +180,6 @@ async function savePlayerData(userId, data) {
     }
 }
 
-/**
- * 获取所有玩家的数据。
- */
 async function getAllPlayerData() {
     const currentLogger = global.logger || console;
     const allPlayers = [];
@@ -228,7 +214,7 @@ export {
     getPublicItems,
     getTitles,
     getCurrentActivityText,
-    getNpcs, // Correctly exporting getNpcs now
+    getNpcs,
     getPlayerData,
     savePlayerData,
     getAllPlayerData,

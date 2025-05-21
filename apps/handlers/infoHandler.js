@@ -1,19 +1,9 @@
 // camellia-plugin/apps/handlers/infoHandler.js
 
-/**
- * @file 信息展示和帮助指令处理器。
- * @description 处理查看个人信息、地图/武器列表、排行榜和帮助。
- */
-
 import { getPlayerData, getMaps, getWeapons, getAllPlayerData, getTitles } from '../../utils/dataManager.js';
 import { makeForwardMsgWithContent } from '../../utils/messageHelper.js';
-import { MAX_MESSAGE_LENGTH, VALID_STRATEGIES } from '../../utils/constants.js';
+import { MAX_MESSAGE_LENGTH, VALID_STRATEGIES, INJURY_LEVELS } from '../../utils/constants.js'; // Added INJURY_LEVELS
 
-/**
- * 处理查看“我的信息”的请求。
- * @param {object} e - Yunzai的事件对象。
- * @param {object} pluginInstance - 插件主类的实例。
- */
 export async function handleViewMyInfo(e, pluginInstance) {
     const userId = e.user_id;
     const nickname = e.sender.card || e.sender.nickname || `调查员${String(userId).slice(-4)}`;
@@ -35,14 +25,20 @@ export async function handleViewMyInfo(e, pluginInstance) {
     }
     infoMsg += `资金: ${playerData.funds}\n`;
 
-    // 显示称号信息
+    // Request 5: Display injury status
+    if (playerData.needsTreatment && playerData.permanentInjuryStatus && playerData.permanentInjuryStatus !== 'none') {
+        const injuryName = INJURY_LEVELS[playerData.permanentInjuryStatus]?.name || playerData.permanentInjuryStatus;
+        infoMsg += `健康状况: 【${injuryName}】 (建议使用 #治疗 进行休整)\n`;
+    } else {
+        infoMsg += `健康状况: 良好\n`;
+    }
+
     infoMsg += `当前身份标识: ${playerData.activeTitle ? `【${playerData.activeTitle}】` : '无'}\n`;
     if (playerData.purchasedTitles && playerData.purchasedTitles.length > 0) {
         infoMsg += `已认证标识 (${playerData.purchasedTitles.length}): ${playerData.purchasedTitles.join('、 ')}\n`;
     } else {
         infoMsg += `已认证标识: 无\n`;
     }
-
 
     infoMsg += `持有装备 (${playerData.heldWeapons ? playerData.heldWeapons.length : 0}):\n`;
     if (playerData.heldWeapons && playerData.heldWeapons.length > 0) {
@@ -57,12 +53,13 @@ export async function handleViewMyInfo(e, pluginInstance) {
     infoMsg += `个人收藏 (${playerData.collectibles ? playerData.collectibles.length : 0}):\n`;
     if (playerData.collectibles && playerData.collectibles.length > 0) {
         playerData.collectibles.forEach(c => {
-            infoMsg += `  - ${c.name} (${c.rarity}), 参考价值: ${c.price || 0} 资金\n`;
+            infoMsg += `  - ${c.name} (${c.rarity || '未知'}), 参考价值: ${c.price || 0} 资金\n`;
         });
     } else {
         infoMsg += `  暂无特殊收藏品\n`;
     }
 
+    // Sending logic (assumed correct from original)
     if (infoMsg.length > MAX_MESSAGE_LENGTH && global.Bot && global.Bot.makeForwardMsg) {
         try {
             const forwardMsg = await makeForwardMsgWithContent([infoMsg.trim()], "个人档案");
@@ -81,11 +78,6 @@ export async function handleViewMyInfo(e, pluginInstance) {
     return true;
 }
 
-/**
- * 处理显示帮助信息的请求。
- * @param {object} e - Yunzai的事件对象。
- * @param {object} pluginInstance - 插件主类的实例。
- */
 export async function handleShowHelp(e, pluginInstance) {
     const helpMsg = `--- 都市迷踪行动手册 ---\n` +
         `#进入地图 地图名/编号 武器 武器名 策略 策略名 - 前往指定异常区域进行探索。\n` +
@@ -98,6 +90,9 @@ export async function handleShowHelp(e, pluginInstance) {
         `#装备称号 称号名称 / #装备称号 无 - 展示或卸下已认证的身份标识。\n` +
         `#出售物品 物品名称 - 将“收藏品”兑换为资金。\n` +
         `#我的信息 - 查看个人资金、装备、收藏品和身份标识。\n` +
+        // Request 5: Add hospital commands to help
+        `#治疗 - 查看当前伤势及治疗所需资金。\n` +
+        `#确认治疗 - 执行治疗，恢复健康状态并扣除资金。\n` +
         `#地图列表 - 显示所有已知的异常区域及其情报(附带编号)。\n` +
         `#武器列表 - 显示所有已记录的装备型号及其参数。\n` +
         `#排行榜 - 查看“资金”排行榜。\n` +
@@ -108,12 +103,8 @@ export async function handleShowHelp(e, pluginInstance) {
     return true;
 }
 
-/**
- * 处理显示地图列表的请求。
- * @param {object} e - Yunzai的事件对象。
- * @param {object} pluginInstance - 插件主类的实例。
- */
 export async function handleListMaps(e, pluginInstance) {
+    // ... (List maps logic - assumed correct)
     const maps = getMaps();
     if (!maps || maps.length === 0) {
         return e.reply("当前“都市档案库”中没有可用的区域情报。");
@@ -147,12 +138,8 @@ export async function handleListMaps(e, pluginInstance) {
     return true;
 }
 
-/**
- * 处理显示武器列表的请求。
- * @param {object} e - Yunzai的事件对象。
- * @param {object} pluginInstance - 插件主类的实例。
- */
 export async function handleListWeapons(e, pluginInstance) {
+    // ... (List weapons logic - assumed correct)
     const weapons = getWeapons();
     if (!weapons || weapons.length === 0) {
         return e.reply("当前“装备数据库”中没有信息。");
@@ -162,10 +149,9 @@ export async function handleListWeapons(e, pluginInstance) {
         weaponListMsg += `\n型号: ${w.name}\n` +
             `  稀有度: ${w.rarity || '标准'}\n` +
             `  基础威胁评估: ${w.baseCombatPower}\n` +
-            `  特性: ${w.passive || '无'} (类型: ${w.passiveType || 'none'})\n` + // 显示被动类型
-            `     效果: ${w.passiveDescription || w.description || '暂无详细描述'}\n` + // 显示被动描述
+            `  特性: ${w.passive || '无'} (类型: ${w.passiveType || 'none'})\n` +
+            `     效果: ${w.passiveDescription || w.description || '暂无详细描述'}\n` +
             `  “黑市”价格: ${w.price > 0 ? w.price + ' 资金' : '非卖品/初始装备'}\n`;
-        // `  描述: ${w.description || '暂无公开描述'}\n`; // 可以合并到特性效果里
     });
 
     if (global.Bot && global.Bot.makeForwardMsg) {
@@ -186,15 +172,10 @@ export async function handleListWeapons(e, pluginInstance) {
     return true;
 }
 
-/**
- * 处理显示排行榜的请求。
- * @param {object} e - Yunzai的事件对象。
- * @param {object} pluginInstance - 插件主类的实例。
- */
 export async function handleShowLeaderboard(e, pluginInstance) {
+    // ... (Show leaderboard logic - assumed correct)
     const allPlayersData = await getAllPlayerData();
     const allGameWeapons = getWeapons();
-    // const allGameTitles = getTitles(); // 如果需要显示称号效果，可以加载
 
     if (!allPlayersData || allPlayersData.length === 0) {
         return e.reply("“都市财富榜”暂无数据。");
@@ -211,7 +192,7 @@ export async function handleShowLeaderboard(e, pluginInstance) {
                     bestWeaponName = `${weaponName} (威胁评估 ${maxCombatPower})`;
                 }
             });
-            if (bestWeaponName === "无装备" && player.heldWeapons.includes("制式警棍")) { // 确保制式警棍能正确显示
+            if (bestWeaponName === "无装备" && player.heldWeapons.includes("制式警棍")) {
                 const defaultWeapon = allGameWeapons.find(w => w.name === "制式警棍");
                 if (defaultWeapon) bestWeaponName = `制式警棍 (威胁评估 ${defaultWeapon.baseCombatPower})`;
             }
@@ -224,7 +205,7 @@ export async function handleShowLeaderboard(e, pluginInstance) {
             bestWeaponDisplay: bestWeaponName,
         };
     }).sort((a, b) => b.funds - a.funds)
-        .slice(0, 10); // 只显示前10名
+        .slice(0, 10);
 
     if (leaderboard.length === 0) {
         return e.reply("“都市财富榜”暂无有效数据。");
@@ -232,11 +213,10 @@ export async function handleShowLeaderboard(e, pluginInstance) {
 
     let leaderboardMsg = "--- 都市财富榜 Top 10 ---\n";
     leaderboard.forEach((player, index) => {
-        leaderboardMsg += `\n${index + 1}. ${player.nickname} (编号: ...${String(player.userId).slice(-4)})\n` + // 确保 userId 正确显示
+        leaderboardMsg += `\n${index + 1}. ${player.nickname} (编号: ...${String(player.userId).slice(-4)})\n` +
             `   资金: ${player.funds}\n` +
             `   最强装备: ${player.bestWeaponDisplay}\n`;
     });
-
     if (global.Bot && global.Bot.makeForwardMsg) {
         try {
             const forwardMsg = await makeForwardMsgWithContent([leaderboardMsg.trim()], "都市财富榜");
