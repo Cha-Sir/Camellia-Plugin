@@ -17,12 +17,6 @@ const QUEUE_CHECK_INTERVAL = 60 * 1000; // 1分钟检查一次队列
 const DEFAULT_NPC_FILL_DELAY_MINUTES = 5;
 const PLUGIN_NAME = '都市迷踪（搜打撤）'; // Define plugin name as a constant
 
-// DeepSeek API Configuration
-const DEEPSEEK_API_URL = 'https://api2.aigcbest.top/v1/chat/completions';
-const DEEPSEEK_API_KEY = 'sk-1VPFgLrJ952VJQNc19Dd7678B4D74fAeAfFdFd8a0f31A3C7';
-const DEEPSEEK_MODEL = 'gpt-4o'; // Corrected model name based on user input - likely should be 'deepseek-chat' or similar for chat models
-const DEEPSEEK_PREPROCESSING_PROMPT_PREFIX = `请你扮演一个末日废土风格的事件播报员，用一种激情，解说比赛的语气，将以下战斗记录用类似解说比赛的语气总结下来，保留各种数值。请整合信息，让战斗过程更连贯生动，突出关键转折和戏剧性时刻，但不要改变战斗的实际结果和重要数据。输出格式请保持每条记录一行，不要添加额外的总结性段落。原始记录如下：\n\n`;
-
 let queueCheckIntervalId = null; // Variable to hold the interval ID
 
 /**
@@ -96,62 +90,6 @@ export function stopGameHandlerTimedTasks() {
         clearInterval(queueCheckIntervalId);
         queueCheckIntervalId = null;
         logger.info('[GameHandler] Stopped queue check interval.');
-    }
-}
-
-
-/**
- * Preprocesses the combat log using DeepSeek API.
- * @param {string[]} originalLogArray - The original combat log entries.
- * @param {string} mapName - The name of the map for context.
- * @returns {Promise<string[]>} The preprocessed log entries, or original if API call fails.
- */
-async function preprocessCombatLogWithDeepSeek(originalLogArray, mapName) {
-    if (!originalLogArray || originalLogArray.length === 0) {
-        return [];
-    }
-    const rawLogText = originalLogArray.join('\n');
-    const prompt = `${DEEPSEEK_PREPROCESSING_PROMPT_PREFIX}${rawLogText}`;
-
-    logger.info(`[GameHandler - DeepSeek] Sending combat log for map "${mapName}" to DeepSeek for preprocessing. Log length: ${rawLogText.length}`);
-
-    try {
-        const response = await fetch(DEEPSEEK_API_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: DEEPSEEK_MODEL, // Ensure this model name is correct for the endpoint
-                messages: [
-                    { role: 'user', content: prompt }
-                ],
-                // stream: false, // Optional: ensure non-streaming if not handled
-                // max_tokens: 2048, // Optional: adjust as needed
-                // temperature: 0.7, // Optional: adjust creativity
-            }),
-        });
-
-        if (!response.ok) {
-            const errorBody = await response.text();
-            logger.error(`[GameHandler - DeepSeek] API request failed with status ${response.status}: ${errorBody}`);
-            return originalLogArray; // Fallback to original log
-        }
-
-        const data = await response.json();
-
-        if (data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
-            const processedText = data.choices[0].message.content;
-            logger.info(`[GameHandler - DeepSeek] Successfully preprocessed combat log for map "${mapName}".`);
-            return processedText.split('\n').map(line => line.trim()).filter(line => line.length > 0); // Split back into array
-        } else {
-            logger.error('[GameHandler - DeepSeek] API response format unexpected:', data);
-            return originalLogArray; // Fallback
-        }
-    } catch (error) {
-        logger.error('[GameHandler - DeepSeek] Error calling DeepSeek API:', error);
-        return originalLogArray; // Fallback
     }
 }
 
@@ -575,10 +513,6 @@ export async function processGameInstance(mapName, pluginInstanceFromApp) {
     pool.settlementLog.push(`\n--- [区域: ${mapName}] 探索报告 ---`);
 
     let finalGameProcessLog = pool.gameProcessLog;
-    if (pool.gameProcessLog.length > 0) {
-        logger.info(`[GameHandler] Attempting to preprocess combat log for map "${mapName}"...`);
-        finalGameProcessLog = await preprocessCombatLogWithDeepSeek([...pool.gameProcessLog], mapName);
-    }
 
     for (const p of pool.players) {
         const displayName = getFormattedNickname(p);
@@ -667,7 +601,7 @@ export async function processGameInstance(mapName, pluginInstanceFromApp) {
             const groupToNotify = global.Bot.pickGroup(groupId);
             if (groupToNotify && typeof groupToNotify.sendMsg === 'function') {
                 if (finalGameProcessLog.length > 0) {
-                    const gameProcessForwardMsg = await makeForwardMsgWithContent(finalGameProcessLog, `探索行动记录 (润色版): ${mapName}`);
+                    const gameProcessForwardMsg = await makeForwardMsgWithContent(finalGameProcessLog, `探索行动记录: ${mapName}`);
                     if (gameProcessForwardMsg) await groupToNotify.sendMsg(gameProcessForwardMsg).catch(err => logger.error(`Error sending game process log: ${err}`));
                 }
                 if (pool.settlementLog.length > 0) {
