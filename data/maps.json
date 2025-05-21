@@ -3,14 +3,38 @@
     "name": "普通大坝",
     "entryFee": 0,
     "limitCombatPower": 0,
-    "playerCapacity": 6,
+    "playerCapacity": 5,
     "itemPool": {
-      "普通": ["损坏的义体零件", "应急口粮棒", {"name": "制式警棍", "type": "weapon"}],
-      "稀有": ["加密数据盘", "“呢喃”石块", {"name": "“鹰眼”改装手枪", "type": "weapon"}],
-      "罕见": ["认知滤镜碎片", "“代价”契约残页"],
-      "史诗": [{"name": "“撕裂者”手斧", "type": "weapon"}],
+      "普通": [
+        "损坏的义体零件",
+        "应急口粮棒",
+        {
+          "name": "制式警棍",
+          "type": "weapon"
+        }
+      ],
+      "稀有": [
+        "加密数据盘",
+        "“呢喃”石块",
+        {
+          "name": "“鹰眼”改装手枪",
+          "type": "weapon"
+        }
+      ],
+      "罕见": [
+        "认知滤镜碎片",
+        "“代价”契约残页"
+      ],
+      "史诗": [
+        {
+          "name": "“撕裂者”手斧",
+          "type": "weapon"
+        }
+      ],
       "传奇": [],
-      "收藏品": ["空白书页"]
+      "收藏品": [
+        "空白书页"
+      ]
     },
     "refreshRate": {
       "普通": 0.42,
@@ -20,10 +44,13 @@
       "传奇": 0.01,
       "收藏品": 0.01
     },
-    "npcSpawnChance": 0.3,
-    "maxNpcsToSpawn": 5,
-    "availableNpcIds": ["npc_jack_fixer","npc_1"],
-    "npcFillDelayMinutes": 5,
+    "npcSpawnChance": 0.2,
+    "maxNpcsToSpawn": 4,
+    "availableNpcIds": [
+      "npc_jack_fixer",
+      "npc_1"
+    ],
+    "npcFillDelayMinutes": 3,
     "description": "曾经是繁华的都市下层聚居区，如今已被遗弃，只有扭曲的金属结构和若有若无的低语在回荡。"
   },
   {
@@ -32,12 +59,36 @@
     "limitCombatPower": 90,
     "playerCapacity": 7,
     "itemPool": {
-      "普通": ["损坏的义体零件", "应急口粮棒", {"name": "制式警棍", "type": "weapon"}],
-      "稀有": ["加密数据盘", "“呢喃”石块", {"name": "“鹰眼”改装手枪", "type": "weapon"}],
-      "罕见": ["认知滤镜碎片", "“代价”契约残页"],
-      "史诗": [{"name": "“撕裂者”手斧", "type": "weapon"}],
+      "普通": [
+        "损坏的义体零件",
+        "应急口粮棒",
+        {
+          "name": "制式警棍",
+          "type": "weapon"
+        }
+      ],
+      "稀有": [
+        "加密数据盘",
+        "“呢喃”石块",
+        {
+          "name": "“鹰眼”改装手枪",
+          "type": "weapon"
+        }
+      ],
+      "罕见": [
+        "认知滤镜碎片",
+        "“代价”契约残页"
+      ],
+      "史诗": [
+        {
+          "name": "“撕裂者”手斧",
+          "type": "weapon"
+        }
+      ],
       "传奇": [],
-      "收藏品": ["空白书页"]
+      "收藏品": [
+        "空白书页"
+      ]
     },
     "refreshRate": {
       "普通": 0.42,
@@ -49,7 +100,11 @@
     },
     "npcSpawnChance": 0.65,
     "maxNpcsToSpawn": 3,
-    "availableNpcIds": ["npc_kalix_mistweaver", "npc_jack_fixer", "npc_sentinel_unit_7"],
+    "availableNpcIds": [
+      "npc_kalix_mistweaver",
+      "npc_jack_fixer",
+      "npc_sentinel_unit_7"
+    ],
     "npcFillDelayMinutes": 5,
     "description": "曾经是繁华的都市下层聚居区，如今已被遗弃，只有扭曲的金属结构和若有若无的低语在回荡。"
   },
@@ -59,15 +114,32 @@
     "limitCombatPower": 100,
     "playerCapacity": 5,
     "itemPool": {
-      "普通": ["“安定”注射剂", "应急口粮棒", {"name": "制式警棍", "type": "weapon"}],
-      "稀有": ["“呢喃”石块"],
-      "罕见": ["认知滤镜碎片", {"name": "“迷茫”瓦斯榴弹", "type": "weapon"}],
+      "普通": [
+        "“安定”注射剂",
+        "应急口粮棒",
+        {
+          "name": "制式警棍",
+          "type": "weapon"
+        }
+      ],
+      "稀有": [
+        "“呢喃”石块"
+      ],
+      "罕见": [
+        "认知滤镜碎片",
+        {
+          "name": "“迷茫”瓦斯榴弹",
+          "type": "weapon"
+        }
+      ],
       "史诗": [],
       "传奇": [],
-      "收藏品": ["破损的邀请函"]
+      "收藏品": [
+        "破损的邀请函"
+      ]
     },
     "refreshRate": {
-      "普通": 0.50,
+      "普通": 0.5,
       "稀有": 0.28,
       "罕见": 0.13,
       "史诗": 0.03,
@@ -76,7 +148,10 @@
     },
     "npcSpawnChance": 0.5,
     "maxNpcsToSpawn": 3,
-    "availableNpcIds": ["npc_kalix_mistweaver","npc_1"],
+    "availableNpcIds": [
+      "npc_kalix_mistweaver",
+      "npc_1"
+    ],
     "npcFillDelayMinutes": 4,
     "description": "由于未知“异常”泄露导致感官与认知极易受到干扰的区域，深入其中需要极大的意志力。"
   },
@@ -86,24 +161,53 @@
     "limitCombatPower": 200,
     "playerCapacity": 6,
     "itemPool": {
-      "普通": ["损坏的义体零件"],
-      "稀有": ["加密数据盘", {"name": "“守护”力场手套", "type": "weapon"}],
-      "罕见": ["“代价”契约残页", "认知滤镜碎片"],
-      "史诗": ["“观测者”之眼", "扭曲核心样本", {"name": "“过载”充能枪", "type": "weapon"}],
-      "传奇": [{"name": "“低语”法术书", "type": "weapon"}],
-      "收藏品": ["“回响”调音叉"]
+      "普通": [
+        "损坏的义体零件"
+      ],
+      "稀有": [
+        "加密数据盘",
+        {
+          "name": "“守护”力场手套",
+          "type": "weapon"
+        }
+      ],
+      "罕见": [
+        "“代价”契约残页",
+        "认知滤镜碎片"
+      ],
+      "史诗": [
+        "“观测者”之眼",
+        "扭曲核心样本",
+        {
+          "name": "“过载”充能枪",
+          "type": "weapon"
+        }
+      ],
+      "传奇": [
+        {
+          "name": "“低语”法术书",
+          "type": "weapon"
+        }
+      ],
+      "收藏品": [
+        "“回响”调音叉"
+      ]
     },
     "refreshRate": {
       "普通": 0.12,
       "稀有": 0.33,
-      "罕见": 0.20,
+      "罕见": 0.2,
       "史诗": 0.18,
       "传奇": 0.09,
       "收藏品": 0.08
     },
     "npcSpawnChance": 0.4,
     "maxNpcsToSpawn": 2,
-    "availableNpcIds": ["npc_sentinel_unit_7", "npc_jack_fixer","npc_1"],
+    "availableNpcIds": [
+      "npc_sentinel_unit_7",
+      "npc_jack_fixer",
+      "npc_1"
+    ],
     "npcFillDelayMinutes": 6,
     "description": "传说中收容着世间所有知识与故事的“图书馆”的边缘地带，徘徊着寻求知识的“访客”与守护秘密的“司书”。"
   },
@@ -113,51 +217,102 @@
     "limitCombatPower": 0,
     "playerCapacity": 2,
     "itemPool": {
-      "普通": ["应急口粮棒", {"name": "制式警棍", "type": "weapon"}],
-      "稀有": [{"name": "“撕裂者”手斧", "type": "weapon"}],
-      "罕见": ["认知滤镜碎片"],
-      "史诗": [{"name": "“终末”执行刃", "type": "weapon"}],
-      "传奇": ["“都市之星”碎片"],
-      "收藏品": ["空白书页"]
+      "普通": [
+        "应急口粮棒",
+        {
+          "name": "制式脉冲步枪",
+          "type": "weapon"
+        }
+      ],
+      "稀有": [
+        {
+          "name": "求生者工具包",
+          "type": "weapon"
+        }
+      ],
+      "罕见": [
+        "认知滤镜碎片"
+      ],
+      "史诗": [
+        {
+          "name": "流放者砍刀",
+          "type": "weapon"
+        }
+      ],
+      "传奇": [
+        "“都市之星”碎片"
+      ],
+      "收藏品": [
+        "空白书页"
+      ]
     },
     "refreshRate": {
-      "普通": 0.30,
+      "普通": 0.3,
       "稀有": 0.25,
-      "罕见": 0.20,
-      "史诗": 0.00,
-      "传奇": 0.00,
-      "收藏品": 0.00
+      "罕见": 0.2,
+      "史诗": 0,
+      "传奇": 0,
+      "收藏品": 0
     },
     "npcSpawnChance": 0.9,
     "maxNpcsToSpawn": 1,
-    "availableNpcIds": ["npc_kalix_mistweaver"],
+    "availableNpcIds": [
+      "npc_kalix_mistweaver"
+    ],
     "npcFillDelayMinutes": 1,
     "description": "系统管理员用于调试各项参数的虚拟空间，现象极不稳定。"
-  },{
-  "name": "测试大坝",
-  "entryFee": 0,
-  "limitCombatPower": 0,
-  "playerCapacity": 2,
-  "itemPool": {
-    "普通": ["损坏的义体零件", "应急口粮棒", {"name": "制式警棍", "type": "weapon"}],
-    "稀有": ["加密数据盘", "“呢喃”石块", {"name": "“鹰眼”改装手枪", "type": "weapon"}],
-    "罕见": ["认知滤镜碎片", "“代价”契约残页"],
-    "史诗": [{"name": "“撕裂者”手斧", "type": "weapon"}],
-    "传奇": [],
-    "收藏品": ["空白书页"]
   },
-  "refreshRate": {
-    "普通": 0.42,
-    "稀有": 0.47,
-    "罕见": 0.16,
-    "史诗": 0.06,
-    "传奇": 0.01,
-    "收藏品": 0.01
-  },
-  "npcSpawnChance": 0.3,
-  "maxNpcsToSpawn": 5,
-  "availableNpcIds": ["npc_1"],
-  "npcFillDelayMinutes": 5,
-  "description": "曾经是繁华的都市下层聚居区，如今已被遗弃，只有扭曲的金属结构和若有若无的低语在回荡。"
-}
+  {
+    "name": "测试大坝",
+    "entryFee": 0,
+    "limitCombatPower": 0,
+    "playerCapacity": 2,
+    "itemPool": {
+      "普通": [
+        "损坏的义体零件",
+        "应急口粮棒",
+        {
+          "name": "制式警棍",
+          "type": "weapon"
+        }
+      ],
+      "稀有": [
+        "加密数据盘",
+        "“呢喃”石块",
+        {
+          "name": "“鹰眼”改装手枪",
+          "type": "weapon"
+        }
+      ],
+      "罕见": [
+        "认知滤镜碎片",
+        "“代价”契约残页"
+      ],
+      "史诗": [
+        {
+          "name": "“撕裂者”手斧",
+          "type": "weapon"
+        }
+      ],
+      "传奇": [],
+      "收藏品": [
+        "空白书页"
+      ]
+    },
+    "refreshRate": {
+      "普通": 0.42,
+      "稀有": 0.47,
+      "罕见": 0.16,
+      "史诗": 0.06,
+      "传奇": 0.01,
+      "收藏品": 0.01
+    },
+    "npcSpawnChance": 0.3,
+    "maxNpcsToSpawn": 5,
+    "availableNpcIds": [
+      "npc_1"
+    ],
+    "npcFillDelayMinutes": 5,
+    "description": "曾经是繁华的都市下层聚居区，如今已被遗弃，只有扭曲的金属结构和若有若无的低语在回荡。"
+  }
 ]
