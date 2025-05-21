@@ -462,7 +462,7 @@ async function performCombat(attacker, defender, pool, allWeapons, pluginInstanc
         const dialogueKey = attacker.npcDefinition.dialogue.onEngage || attacker.npcDefinition.dialogue.onEncounter;
         if (dialogueKey) pool.gameProcessLog.push(`  🗣️ [${attackerDisplayName}]: "${dialogueKey}"`);
     }
-    if (defender.isNpc && defender.npcDefinition?.dialogue && defender.userId !== attacker.userId) {
+    if (defender.isNpc && defender.npcDefinition?.dialogue && defender.userId !== attacker.userId) { // 避免自己对自己说话
         const dialogueKey = defender.npcDefinition.dialogue.onEngage || defender.npcDefinition.dialogue.onEncounter;
         if (dialogueKey) pool.gameProcessLog.push(`  🗣️ [${defenderDisplayName}]: "${dialogueKey}"`);
     }
@@ -470,58 +470,81 @@ async function performCombat(attacker, defender, pool, allWeapons, pluginInstanc
     // NPC逃跑大师战前判定
     if (defender.isNpc && defender.combatPassive?.type === 'master_escape' && defender.status === 'active') {
         const npcWeaponPower = defender.weapon?.baseCombatPower || defender.npcDefinition?.baseCombatPower || 0;
-        const attackerWeaponPower = attacker.weapon?.baseCombatPower || 0;
-        const powerRatioThreshold = defender.combatPassive.details?.powerRatioThreshold || 0.7;
+        const attackerWeaponPower = attacker.weapon?.baseCombatPower || 0; // 攻击方武器战力
+        const powerRatioThreshold = defender.combatPassive.details?.powerRatioThreshold || 0.7; // 例如，NPC战力低于攻击者70%
 
-        if (npcWeaponPower < attackerWeaponPower * powerRatioThreshold) {
-            const escapeChance = defender.combatPassive.details?.escapeChance || 0.75;
+        if (npcWeaponPower < attackerWeaponPower * powerRatioThreshold) { // 如果NPC战力显著低于攻击者
+            const escapeChance = defender.combatPassive.details?.escapeChance || 0.75; // 逃跑成功率
             if (Math.random() < escapeChance) {
                 defender.status = 'escaped';
                 pool.gameProcessLog.push(`  [${defenderDisplayName}] (${defender.combatPassive.name || '逃跑大师'}) 感知到巨大威胁，瞬间消失在阴影中，成功脱离战斗！`);
                 if (defender.npcDefinition?.dialogue?.onEscape) pool.gameProcessLog.push(`  🗣️ [${defenderDisplayName}]: "${defender.npcDefinition.dialogue.onEscape}"`);
-                return;
+                return; // 战斗结束
             } else {
                 pool.gameProcessLog.push(`  [${defenderDisplayName}] (${defender.combatPassive.name || '逃跑大师'}) 试图脱离，但被 [${attackerDisplayName}] 缠住！`);
             }
         }
     }
 
-    // 计算战斗力并应用被动
-    const combatResult = calculateCombatPowerWithPassives(attacker, defender, allWeapons);
-    combatResult.log.forEach(log => pool.gameProcessLog.push(`  ${log}`)); // 将战斗计算日志加入游戏过程日志
 
-    // 决定战斗结果
+    // 计算战斗力并应用被动 (calculateCombatPowerWithPassives 应返回 attackerFinalPower, defenderFinalPower, successRateModifier, log)
+    const combatResult = calculateCombatPowerWithPassives(attacker, defender, allWeapons);
+    // combatResult.log 包含了被动技能触发等详细战斗力计算过程
+    combatResult.log.forEach(log => pool.gameProcessLog.push(`  ${log}`));
+
+    // 决定战斗结果 (determineBattleOutcome 应返回 attackerWins, roll, threshold, baseSuccessRate, finalSuccessRate)
+    // combatResult.successRateModifier 是环境/策略等对成功率的直接修正值
+    // combatResult 本身可以作为上下文传递给 determineBattleOutcome，如果它需要更多信息
     const outcome = determineBattleOutcome(combatResult.attackerFinalPower, combatResult.defenderFinalPower, combatResult.successRateModifier, combatResult);
+
     let winner = outcome.attackerWins ? attacker : defender;
     let loser = outcome.attackerWins ? defender : attacker;
-    const winnerDisplayName = getFormattedNickname(winner);
-    const loserDisplayNameForLog = getFormattedNickname(loser);
+    const winnerDisplayName = getFormattedNickname(winner); // 获胜者名称
+    const loserDisplayNameForLog = getFormattedNickname(loser); // 失败者名称，用于日志
 
-    // 优化日志输出：显示投掷详情
-    const detailMatch = outcome.detail.match(/判定掷骰: ([\d.]+), 攻击方胜率阈值: ([\d.]+)/);
-    let battleRoll = "N/A", battleThreshold = "N/A";
-    if (detailMatch) {
-        battleRoll = parseFloat(detailMatch[1]).toFixed(3);
-        battleThreshold = parseFloat(detailMatch[2]).toFixed(3);
+    // --- 新的战斗总结日志 ---
+    const powerDifferenceVal = combatResult.attackerFinalPower - combatResult.defenderFinalPower;
+    // powerDiffEffectPct: 因战力差导致的基础成功率相对于50%的变化量
+    const powerDiffEffectPct = Math.round((outcome.baseSuccessRate - 0.5) * 100);
+    // envModifierPct: 随机环境/策略等因素对成功率的直接修正值（百分比）
+    const envModifierPct = Math.round(combatResult.successRateModifier * 100);
+    // finalSuccessRatePct: 最终成功率（百分比）
+    const finalSuccessRatePct = Math.round(outcome.finalSuccessRate * 100);
+    // rollPct: 攻击方投掷结果（百分比）
+    const rollPct = Math.round(outcome.roll * 100);
+    // thresholdDisplayPct: 攻击成功的阈值（百分比），即最终成功率
+    const thresholdDisplayPct = finalSuccessRatePct;
+
+    let summaryMessage = `  因为战力差 ${powerDifferenceVal} (攻${combatResult.attackerFinalPower} vs 防${combatResult.defenderFinalPower})`;
+    // "成功率+X%" 部分指的是基础成功率因战力差较50%基准的变化
+    summaryMessage += `，成功率${powerDiffEffectPct >= 0 ? '+' : ''}${powerDiffEffectPct}%`;
+
+    if (envModifierPct !== 0) {
+        summaryMessage += `，经过随机环境计算，成功率${envModifierPct > 0 ? '+' : ''}${envModifierPct}%`;
     }
-    pool.gameProcessLog.push(`  战斗判定: ${attackerDisplayName} (攻击方) 投掷 ${battleRoll} vs 成功阈值 ${battleThreshold}.`);
-    if (outcome.attackerWins) {
-        pool.gameProcessLog.push(`  结果: ${attackerDisplayName} 的投掷 (${battleRoll}) 小于阈值 (${battleThreshold})，攻击成功！ [${winnerDisplayName}] 占据上风!`);
-    } else {
-        pool.gameProcessLog.push(`  结果: ${attackerDisplayName} 的投掷 (${battleRoll}) 大于或等于阈值 (${battleThreshold})，攻击失败！ [${winnerDisplayName}] 占据上风!`);
-    }
+
+    summaryMessage += `，最终成功率为 ${finalSuccessRatePct}%。`;
+    summaryMessage += ` 【${attackerDisplayName}】投掷结果为 ${rollPct}，`;
+    summaryMessage += outcome.attackerWins ? `小于 ${thresholdDisplayPct}` : `大于或等于 ${thresholdDisplayPct}`;
+    summaryMessage += `，结算判定: ${outcome.attackerWins ? '攻击成功' : '攻击失败'}！`;
+
+    // 添加胜者信息
+    summaryMessage += ` [${winnerDisplayName}] 占据上风!`;
+
+    pool.gameProcessLog.push(summaryMessage);
+    // --- 战斗总结日志结束 ---
 
     // 处理战败方状态
     if (loser.status === 'active' || loser.status === 'wounded') {
-        if (loser.status === 'wounded' && !combatResult.loserIgnoresWounded) {
-            loser.status = 'defeated'; // 如果已受伤再受攻击且无被动豁免，则被击败
+        if (loser.status === 'wounded' && !combatResult.loserIgnoresWounded) { // 如果已受伤再受攻击且无被动豁免
+            loser.status = 'defeated';
             if (loser.isNpc && loser.npcDefinition?.dialogue?.onDefeat) pool.gameProcessLog.push(`  🗣️ [${loserDisplayNameForLog}]: "${loser.npcDefinition.dialogue.onDefeat}"`);
             pool.gameProcessLog.push(`  [${loserDisplayNameForLog}] 已受重创，不敌对手，被迫退出探索！`);
-            if (pluginInstance || winner.isNpc) await transferSpoils(winner, loser, pool, pluginInstance, allWeapons); // 转移战利品
+            if (pluginInstance || winner.isNpc) await transferSpoils(winner, loser, pool, pluginInstance, allWeapons);
             else pool.gameProcessLog.push(`  [系统警告] 由于核心组件错误，无法处理战利品转移。`);
 
-        } else {
-            // 玩家战败逻辑：变为负伤状态，继续探索
+        } else { // 首次战败或有豁免
+            // 玩家战败逻辑：变为负伤状态，继续探索 (如果还能继续)
             if (!loser.isNpc) {
                 if (!combatResult.loserIgnoresWounded) {
                     loser.status = 'wounded';
@@ -530,9 +553,11 @@ async function performCombat(attacker, defender, pool, allWeapons, pluginInstanc
                     pool.gameProcessLog.push(`  [${loserDisplayNameForLog}] 在战斗中失利，但凭借特殊能力避免了即时负伤，继续探索！`);
                 }
             } else { // NPC战败逻辑：可能逃跑或被击败
-                let escUnharmedNPC = POST_COMBAT_ESCAPE_UNHARMED_CHANCE, escWoundedNPC = POST_COMBAT_ESCAPE_WOUNDED_CHANCE;
+                let escUnharmedNPC = POST_COMBAT_ESCAPE_UNHARMED_CHANCE;
+                let escWoundedNPC = POST_COMBAT_ESCAPE_WOUNDED_CHANCE;
+                // 检查NPC武器是否有战后逃跑加成
                 if (loser.weapon?.passiveType === 'escape_boost_post_combat') {
-                    const boost = loser.weapon.passiveValue || 0.15;
+                    const boost = loser.weapon.passiveValue || 0.15; // 假设加成值为0.15 (15%)
                     escUnharmedNPC += boost;
                     escWoundedNPC += boost;
                     pool.gameProcessLog.push(`  [${loserDisplayNameForLog}] 的装备 (${loser.weapon.name}) 触发特性 [${loser.weapon.passive || '紧急脱离'}]，尝试增加逃脱几率！`);
@@ -542,26 +567,25 @@ async function performCombat(attacker, defender, pool, allWeapons, pluginInstanc
                 if (escRoll < escUnharmedNPC) { // NPC无伤逃脱
                     loser.status = 'escaped';
                     pool.gameProcessLog.push(`  [${loserDisplayNameForLog}] 反应迅速，在混乱中成功撤退！未损失物资。`);
-                    if (loser.npcDefinition?.dialogue?.onEscape) pool.gameProcessLog.push(`  🗣️ [${loserDisplayNameForLog}]: "${loser.npcDefinition.dialogue.onEscape}"`);
+                    if (loser.isNpc && loser.npcDefinition?.dialogue?.onEscape) pool.gameProcessLog.push(`  🗣️ [${loserDisplayNameForLog}]: "${loser.npcDefinition.dialogue.onEscape}"`);
                 } else if (escRoll < escUnharmedNPC + escWoundedNPC) { // NPC负伤逃脱 (或仅负伤)
                     if (!combatResult.loserIgnoresWounded) {
-                        loser.status = 'wounded';
+                        loser.status = 'wounded'; // 变为负伤状态
                         pool.gameProcessLog.push(`  [${loserDisplayNameForLog}] 冲突失利，受到创伤！但成功保留当前物资并暂时后撤。`);
                     } else {
                         pool.gameProcessLog.push(`  [${loserDisplayNameForLog}] 冲突失利，但其特性使其免于负伤，暂时后撤。`);
                     }
                 } else { // NPC被击败
                     loser.status = 'defeated';
-                    if (loser.npcDefinition?.dialogue?.onDefeat) pool.gameProcessLog.push(`  🗣️ [${loserDisplayNameForLog}]: "${loser.npcDefinition.dialogue.onDefeat}"`);
+                    if (loser.isNpc && loser.npcDefinition?.dialogue?.onDefeat) pool.gameProcessLog.push(`  🗣️ [${loserDisplayNameForLog}]: "${loser.npcDefinition.dialogue.onDefeat}"`);
                     pool.gameProcessLog.push(`  [${loserDisplayNameForLog}] 未能成功脱离，被 [${winnerDisplayName}] 击倒！`);
-                    if (pluginInstance || winner.isNpc) await transferSpoils(winner, loser, pool, pluginInstance, allWeapons); // 转移战利品
+                    if (pluginInstance || winner.isNpc) await transferSpoils(winner, loser, pool, pluginInstance, allWeapons);
                     else pool.gameProcessLog.push(`  [系统警告] 由于核心组件错误，无法处理战利品转移。`);
                 }
             }
         }
     }
 }
-
 // 执行搜寻动作
 async function performSearchAction(playerInGame, pool, allItems, allWeapons, publicItemsPool, gameLogArray, pluginInstance) {
     const itemsToObtainCount = Math.floor(Math.random() * 2) + 1;

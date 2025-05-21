@@ -60,7 +60,6 @@
       "description": "【逃跑大师】杰克总能找到脱身的机会。若战局不利（自身战力远低于对手），将有极高概率直接脱离战斗。",
       "details": {
         "escapeChance": 0.90,
-        "condition": "self_power_much_lower",
         "powerRatioThreshold": 0.6
       }
     },
@@ -126,6 +125,9 @@
       { "type": "weapon", "name": "流放者砍刀", "dropChance": 0.5}
     ],
     "combatPassive": {
+      "type": "none",
+      "name": "无特殊能力",
+      "description": "该单位无特殊战斗能力。"
     },
     "dialogue": {
       "onEncounter": "内脏……",

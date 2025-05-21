@@ -5,6 +5,101 @@
  * @description 根据被动类型应用具体效果，并返回对战斗参数的修改。
  */
 
+// --- Helper Functions for Common Passive Effects ---
+
+/**
+ * 统一处理威力提升的帮助函数。
+ * @param {number} currentPower - 当前威力值。
+ * @param {number|undefined} value - 提升的数值或百分比 (例如 0.1 代表 10%)。
+ * @param {boolean} isPercentage - value是否为百分比。
+ * @param {Array<string>} logCollector - 日志收集器。
+ * @param {string} effectName - 效果名称，用于日志。
+ * @param {string} entityNickname - 触发效果的实体昵称。
+ * @param {string} weaponName - 触发效果的武器名称。
+ * @returns {number} - 计算后的新威力值。
+ */
+function _applyPowerBoost(currentPower, value, isPercentage, logCollector, effectName, entityNickname, weaponName) {
+    const boostVal = Number(value) || 0;
+    let newPower = currentPower;
+    let logMsg = `  特性[${effectName}]@${entityNickname}(${weaponName}): `;
+
+    if (isPercentage) {
+        newPower = currentPower * (1 + boostVal);
+        logMsg += `威胁评估提升 ${(boostVal * 100).toFixed(0)}%。`;
+    } else {
+        newPower = currentPower + boostVal;
+        logMsg += `威胁评估提升 ${boostVal}。`;
+    }
+    logCollector.push(logMsg);
+    return Math.max(0, Math.round(newPower));
+}
+
+/**
+ * 统一处理威力削弱的帮助函数。
+ * @param {number} currentPower - 当前威力值。
+ * @param {number|undefined} value - 削弱的数值或百分比 (例如 0.1 代表 10%)。
+ * @param {boolean} isPercentage - value是否为百分比。
+ * @param {Array<string>} logCollector - 日志收集器。
+ * @param {string} effectName - 效果名称，用于日志。
+ * @param {string} entityNickname - 触发效果的实体昵称。
+ * @param {string} weaponName - 触发效果的武器名称。
+ * @param {string} targetNickname - 被影响的目标昵称。
+ * @returns {number} - 计算后的新威力值。
+ */
+function _applyPowerDebuff(currentPower, value, isPercentage, logCollector, effectName, entityNickname, weaponName, targetNickname) {
+    const debuffVal = Number(value) || 0;
+    let newPower = currentPower;
+    let logMsg = `  特性[${effectName}]@${entityNickname}(${weaponName}) 影响 ${targetNickname}: `;
+
+    if (isPercentage) {
+        newPower = currentPower * (1 - debuffVal);
+        logMsg += `威胁评估降低 ${(debuffVal * 100).toFixed(0)}%。`;
+    } else {
+        newPower = currentPower - debuffVal;
+        logMsg += `威胁评估降低 ${debuffVal}。`;
+    }
+    logCollector.push(logMsg);
+    return Math.max(0, Math.round(newPower));
+}
+
+/**
+ * 统一处理成功率修正的帮助函数。
+ * @param {number} currentSuccessRateMod - 当前的成功率修正值。
+ * @param {number|undefined} modValue - 本次修正的数值 (例如 0.1 代表 +10%)。
+ * @param {Array<string>} logCollector - 日志收集器。
+ * @param {string} effectName - 效果名称，用于日志。
+ * @param {string} entityNickname - 触发效果的实体昵称。
+ * @param {string} weaponName - 触发效果的武器名称。
+ * @returns {number} - 计算后的新成功率修正值。
+ */
+function _applySuccessRateModifier(currentSuccessRateMod, modValue, logCollector, effectName, entityNickname, weaponName) {
+    const val = Number(modValue) || 0;
+    logCollector.push(`  特性[${effectName}]@${entityNickname}(${weaponName}): 交战成功率修正 ${((val) * 100).toFixed(0)}%。`);
+    return currentSuccessRateMod + val;
+}
+
+/**
+ * 记录条件未满足的日志。
+ * @param {Array<string>} logCollector - 日志收集器。
+ * @param {string} passiveName - 被动技能名称。
+ * @param {string} entityNickname - 实体昵称。
+ * @param {string} weaponName - 武器名称。
+ * @param {string} reason - 未满足的原因。
+ */
+function _logConditionNotMet(logCollector, passiveName, entityNickname, weaponName, reason) {
+    logCollector.push(`  特性[${passiveName}]@${entityNickname}(${weaponName}) 条件未满足: ${reason}。`);
+}
+
+/**
+ * 记录通用日志。
+ * @param {Array<string>} logCollector - 日志收集器。
+ * @param {string} message - 要记录的消息。
+ */
+function _logGeneric(logCollector, message) {
+    logCollector.push(`  ${message}`);
+}
+
+
 /**
  * 应用攻击方的武器被动效果。
  * @param {object} attacker - 攻击方对象 (玩家或NPC)。
@@ -12,137 +107,112 @@
  * @param {object} attackerWeaponDef - 攻击方武器的完整定义。
  * @param {number} initialAttackerPower - 攻击方应用被动前的基础战力。
  * @param {number} initialDefenderPower - 防守方应用被动前的基础战力。
- * @param {Array<string>} combatLog - 战斗日志数组 (此函数不直接修改，返回logEntries)。
  * @returns {object} 包含对战力、成功率等的修改。
  */
-export function applyAttackerWeaponPassives(attacker, defender, attackerWeaponDef, initialAttackerPower, initialDefenderPower, combatLog) {
+export function applyAttackerWeaponPassives(attacker, defender, attackerWeaponDef, initialAttackerPower, initialDefenderPower) {
     let attackerPower = initialAttackerPower;
     let defenderPower = initialDefenderPower;
     let successRateMod = 0;
     let ignoresWounded = false;
     const localLog = [];
+    const attackerName = attacker.nickname || '攻击方';
+    const defenderName = defender.nickname || '防守方';
 
     if (!attackerWeaponDef || !attackerWeaponDef.passiveType || attackerWeaponDef.passiveType === "none") {
-        if (attackerWeaponDef && attackerWeaponDef.name !== "制式警棍") { // Log only if it's not the default "none" passive weapon
-            localLog.push(`攻击方 (${attacker.nickname} - ${attackerWeaponDef.name}) 无特殊武器特性。`);
+        if (attackerWeaponDef && attackerWeaponDef.name !== "制式警棍") {
+            _logGeneric(localLog, `攻击方 (${attackerName} - ${attackerWeaponDef.name}) 无特殊武器特性。`);
         }
         return { attackerPower, defenderPower, successRateMod, ignoresWounded, logEntries: localLog };
     }
 
-    localLog.push(`攻击方 (${attacker.nickname} - ${attackerWeaponDef.name}) 武器特性 [${attackerWeaponDef.passive || attackerWeaponDef.passiveType}] 发动...`);
+    const passiveName = attackerWeaponDef.passive || attackerWeaponDef.passiveType;
+    _logGeneric(localLog, `攻击方 (${attackerName} - ${attackerWeaponDef.name}) 武器特性 [${passiveName}] 发动...`);
 
     switch (attackerWeaponDef.passiveType) {
-        case "power_boost_flat": // 数值威力提升
-            attackerPower += (attackerWeaponDef.passiveValue || 0);
-            localLog.push(`  效果: 威胁评估提升 ${attackerWeaponDef.passiveValue || 0}。`);
+        case "power_boost_flat":
+            attackerPower = _applyPowerBoost(attackerPower, attackerWeaponDef.passiveValue, false, localLog, passiveName, attackerName, attackerWeaponDef.name);
             break;
-        case "power_boost_percentage": // 百分比威力提升 (例如 "撕裂者手斧", "鹰眼改装手枪", "低语法术书")
-            attackerPower *= (1 + (attackerWeaponDef.passiveValue || 0));
-            localLog.push(`  效果: 威胁评估提升 ${((attackerWeaponDef.passiveValue || 0) * 100).toFixed(0)}%。`);
+        case "power_boost_percentage":
+            attackerPower = _applyPowerBoost(attackerPower, attackerWeaponDef.passiveValue, true, localLog, passiveName, attackerName, attackerWeaponDef.name);
             break;
-        case "target_power_debuff_flat": // 数值削弱目标威力
-            defenderPower -= (attackerWeaponDef.passiveValue || 0);
-            localLog.push(`  效果: 压制目标，其威胁评估降低 ${attackerWeaponDef.passiveValue || 0}。`);
+        case "target_power_debuff_flat":
+            defenderPower = _applyPowerDebuff(defenderPower, attackerWeaponDef.passiveValue, false, localLog, passiveName, attackerName, attackerWeaponDef.name, defenderName);
             break;
-        case "target_power_debuff_percentage": // 百分比削弱目标威力 (例如 "迷茫瓦斯榴弹")
-            defenderPower *= (1 - (attackerWeaponDef.passiveValue || 0));
-            localLog.push(`  效果: 干扰目标，其威胁评估降低 ${((attackerWeaponDef.passiveValue || 0) * 100).toFixed(0)}%。`);
+        case "target_power_debuff_percentage":
+            defenderPower = _applyPowerDebuff(defenderPower, attackerWeaponDef.passiveValue, true, localLog, passiveName, attackerName, attackerWeaponDef.name, defenderName);
             break;
-        case "power_boost_if_target_wounded": // 目标受伤时威力提升 (例如 "“猎手”义眼", "血色长镰")
+        case "power_boost_if_target_wounded":
             if (defender.status === 'wounded') {
-                const boostValue = attackerWeaponDef.passiveValue || 0.2;
-                attackerPower *= (1 + boostValue);
-                localLog.push(`  效果: 目标已受创！乘胜追击，威胁评估提升 ${(boostValue * 100).toFixed(0)}%。`);
+                attackerPower = _applyPowerBoost(attackerPower, attackerWeaponDef.passiveValue || 0.2, true, localLog, `${passiveName} (目标受创)`, attackerName, attackerWeaponDef.name);
             } else {
-                localLog.push(`  特性条件未满足: 目标状态完好。`);
+                _logConditionNotMet(localLog, passiveName, attackerName, attackerWeaponDef.name, "目标状态完好");
             }
             break;
-        case "power_boost_if_self_wounded": // 自身受伤时威力提升 (例如 "“血怒”战斧")
+        case "power_boost_if_self_wounded":
             if (attacker.status === 'wounded') {
-                const boostValue = attackerWeaponDef.passiveValue || 0.25;
-                attackerPower *= (1 + boostValue);
-                localLog.push(`  效果: 自身受创！激发潜能，威胁评估提升 ${(boostValue * 100).toFixed(0)}%。`);
+                attackerPower = _applyPowerBoost(attackerPower, attackerWeaponDef.passiveValue || 0.25, true, localLog, `${passiveName} (自身受创)`, attackerName, attackerWeaponDef.name);
             } else {
-                localLog.push(`  特性条件未满足: 自身状态完好。`);
+                _logConditionNotMet(localLog, passiveName, attackerName, attackerWeaponDef.name, "自身状态完好");
             }
             break;
-        case "ignore_self_wounded_status": // 无视自身受伤状态 (例如 "“不屈”核心")
+        case "ignore_self_wounded_status":
             ignoresWounded = true;
-            localLog.push(`  效果: 无视自身损伤，维持标准出力！`);
+            _logGeneric(localLog, `  特性[${passiveName}]@${attackerName}(${attackerWeaponDef.name}): 无视自身损伤，维持标准出力！`);
             break;
-        case "direct_success_rate_modifier": // 直接成功率修正 (例如 "“诡诈”匕首")
-            successRateMod += (attackerWeaponDef.passiveValue || 0);
-            localLog.push(`  效果: 战术调整，交战成功率修正 ${((attackerWeaponDef.passiveValue || 0) * 100).toFixed(0)}%。`);
+        case "direct_success_rate_modifier":
+            successRateMod = _applySuccessRateModifier(successRateMod, attackerWeaponDef.passiveValue, localLog, passiveName, attackerName, attackerWeaponDef.name);
             break;
-        case "critical_hit_success_boost": // (NPC哨兵7号武器)
+        case "critical_hit_success_boost":
             if (attackerWeaponDef.passiveValue && typeof attackerWeaponDef.passiveValue.successRateBonus === 'number') {
-                successRateMod += attackerWeaponDef.passiveValue.successRateBonus;
-                localLog.push(`  特性[${attackerWeaponDef.passive || '精确打击'}]发动: 交战成功率提升 ${(attackerWeaponDef.passiveValue.successRateBonus * 100).toFixed(0)}%。`);
+                successRateMod = _applySuccessRateModifier(successRateMod, attackerWeaponDef.passiveValue.successRateBonus, localLog, passiveName, attackerName, attackerWeaponDef.name);
             } else {
-                localLog.push(`  特性[${attackerWeaponDef.passive || '精确打击'}]发动失败 (参数配置错误)。`);
+                _logGeneric(localLog, `  特性[${passiveName}]@${attackerName}(${attackerWeaponDef.name}) 发动失败 (参数配置错误)。`);
             }
             break;
-        case "target_debuff_on_hit_chance": // 命中时概率削弱目标 (例如 "改装冲击钻")
+        case "target_debuff_on_hit_chance":
             if (attackerWeaponDef.passiveValue && Math.random() < (attackerWeaponDef.passiveValue.chance || 0)) {
                 if (attackerWeaponDef.passiveValue.debuffEffect === "reduce_power_percentage") {
                     const debuffAmount = attackerWeaponDef.passiveValue.debuffAmount || 0;
-                    defenderPower *= (1 - debuffAmount);
-                    defenderPower = Math.max(0, defenderPower);
-                    localLog.push(`  特性[${attackerWeaponDef.passive || '削弱打击'}]触发！目标威胁评估临时降低 ${(debuffAmount * 100).toFixed(0)}%。`);
+                    defenderPower = _applyPowerDebuff(defenderPower, debuffAmount, true, localLog, `${passiveName} (触发)`, attackerName, attackerWeaponDef.name, defenderName);
                 }
             } else {
-                localLog.push(`  特性[${attackerWeaponDef.passive || '削弱打击'}]未触发。`);
+                _logGeneric(localLog, `  特性[${passiveName}]@${attackerName}(${attackerWeaponDef.name}) 未触发。`);
             }
             break;
-        case "multi_hit_chance": // 多次攻击改为威力提升 (例如 "制式脉冲步枪" 玩家版)
-            // passiveValue: {"extra_hits": 1, "chance_per_hit": 0.3, "damage_modifier_per_hit": 0.5}
+        case "multi_hit_chance":
             if (attackerWeaponDef.passiveValue && Math.random() < (attackerWeaponDef.passiveValue.chance_per_hit || 0)) {
-                const boostFactor = attackerWeaponDef.passiveValue.damage_modifier_per_hit || 0.2; // 默认20%
-                attackerPower *= (1 + boostFactor);
-                localLog.push(`  特性[${attackerWeaponDef.passive || '连环攻击'}]触发！火力增强，威胁评估提升 ${(boostFactor * 100).toFixed(0)}%。`);
+                const boostFactor = attackerWeaponDef.passiveValue.damage_modifier_per_hit || 0.2;
+                attackerPower = _applyPowerBoost(attackerPower, boostFactor, true, localLog, `${passiveName} (触发)`, attackerName, attackerWeaponDef.name);
             } else {
-                localLog.push(`  特性[${attackerWeaponDef.passive || '连环攻击'}]未触发。`);
+                _logGeneric(localLog, `  特性[${passiveName}]@${attackerName}(${attackerWeaponDef.name}) 未触发。`);
             }
             break;
-        case "conditional_power_boost_or_debuff": // 条件威力增减 (例如 "过载充能枪")
-            // passiveValue: {"boost": 0.3, "debuff": -0.2, "condition_threshold_multiplier": 0.75, "debuff_chance": 0.1}
+        case "conditional_power_boost_or_debuff":
             if (attackerWeaponDef.passiveValue) {
                 const pv = attackerWeaponDef.passiveValue;
                 if (initialDefenderPower > initialAttackerPower * (pv.condition_threshold_multiplier || 0.75)) {
-                    attackerPower *= (1 + (pv.boost || 0.3));
-                    localLog.push(`  特性[${attackerWeaponDef.passive}]: 威力激增! 威胁评估提升 ${((pv.boost || 0.3) * 100).toFixed(0)}%。`);
+                    attackerPower = _applyPowerBoost(attackerPower, pv.boost || 0.3, true, localLog, `${passiveName} (威力激增)`, attackerName, attackerWeaponDef.name);
                 } else if (Math.random() < (pv.debuff_chance || 0.1)) {
-                    attackerPower *= (1 + (pv.debuff || -0.2)); // debuff is negative
-                    localLog.push(`  特性[${attackerWeaponDef.passive}]失控: 能量反噬! 威胁评估变化 ${((pv.debuff || -0.2) * 100).toFixed(0)}%。`);
+                    attackerPower = _applyPowerBoost(attackerPower, pv.debuff || -0.2, true, localLog, `${passiveName} (能量反噬)`, attackerName, attackerWeaponDef.name); // Debuff is a negative boost
                 } else {
-                    localLog.push(`  特性[${attackerWeaponDef.passive}]: 输出稳定，无特殊波动。`);
+                    _logGeneric(localLog, `  特性[${passiveName}]@${attackerName}(${attackerWeaponDef.name}): 输出稳定，无特殊波动。`);
                 }
             } else {
-                localLog.push(`  特性[${attackerWeaponDef.passive}]: 参数缺失，无效果。`);
+                _logGeneric(localLog, `  特性[${passiveName}]@${attackerName}(${attackerWeaponDef.name}): 参数缺失，无效果。`);
             }
             break;
-        case "direct_success_rate_modifier_conditional": // 条件成功率修正 (例如 "薄瞑")
-            // passiveValue: {"rate_modifier": 1.0, "trigger_chance": 0.05}
+        case "direct_success_rate_modifier_conditional":
             if (attackerWeaponDef.passiveValue && Math.random() < (attackerWeaponDef.passiveValue.trigger_chance || 0.05)) {
-                successRateMod += (attackerWeaponDef.passiveValue.rate_modifier || 1.0);
-                localLog.push(`  特性[${attackerWeaponDef.passive}]激活！交战结果已注定！`);
+                successRateMod = _applySuccessRateModifier(successRateMod, attackerWeaponDef.passiveValue.rate_modifier || 1.0, localLog, `${passiveName} (激活)`, attackerName, attackerWeaponDef.name);
+                _logGeneric(localLog, `    交战结果已注定！`);
             } else {
-                // "薄瞑" 未触发时，描述是 "锋刃依旧致命"，暗示其基础威力高，此处不额外增减，依赖其baseCombatPower
-                localLog.push(`  特性[${attackerWeaponDef.passive}]未完全激活。`);
+                _logGeneric(localLog, `  特性[${passiveName}]@${attackerName}(${attackerWeaponDef.name}) 未完全激活。`);
             }
             break;
-        // 旧版兼容的被动类型，如果它们与新类型重叠，应优先使用新类型或确保逻辑一致
-        // "破片效应" -> power_boost_percentage
-        // "精准校准" -> power_boost_percentage
-        // "认知干扰" -> target_power_debuff_percentage
-        // "异界低语" -> power_boost_percentage
-        // "存在抹消（概率）" -> direct_success_rate_modifier_conditional
         default:
-            localLog.push(`  未知的攻击方武器被动类型: ${attackerWeaponDef.passiveType}。`);
+            _logGeneric(localLog, `  未知的攻击方武器被动类型: ${attackerWeaponDef.passiveType} @${attackerName}(${attackerWeaponDef.name})。`);
     }
-    attackerPower = Math.max(0, Math.round(attackerPower));
-    defenderPower = Math.max(0, Math.round(defenderPower));
-    return { attackerPower, defenderPower, successRateMod, ignoresWounded, logEntries: localLog };
+    return { attackerPower: Math.max(0, Math.round(attackerPower)), defenderPower: Math.max(0, Math.round(defenderPower)), successRateMod, ignoresWounded, logEntries: localLog };
 }
 
 /**
@@ -152,73 +222,63 @@ export function applyAttackerWeaponPassives(attacker, defender, attackerWeaponDe
  * @param {object} defenderWeaponDef - 防守方武器的完整定义。
  * @param {number} initialAttackerPower - 攻击方应用被动前的基础战力。
  * @param {number} initialDefenderPower - 防守方应用被动前的基础战力。
- * @param {Array<string>} combatLog - 战斗日志数组。
  * @returns {object} 包含对战力、成功率等的修改。
  */
-export function applyDefenderWeaponPassives(defender, attacker, defenderWeaponDef, initialAttackerPower, initialDefenderPower, combatLog) {
+export function applyDefenderWeaponPassives(defender, attacker, defenderWeaponDef, initialAttackerPower, initialDefenderPower) {
     let attackerPower = initialAttackerPower;
     let defenderPower = initialDefenderPower;
     let successRateMod = 0;
     let ignoresWounded = false;
     let postCombatIgnoreWound = false;
     const localLog = [];
+    const defenderName = defender.nickname || '防守方';
+    const attackerName = attacker.nickname || '攻击方';
+
 
     if (!defenderWeaponDef || !defenderWeaponDef.passiveType || defenderWeaponDef.passiveType === "none") {
         if (defenderWeaponDef && defenderWeaponDef.name !== "制式警棍") {
-            localLog.push(`防守方 (${defender.nickname} - ${defenderWeaponDef.name}) 无特殊武器特性。`);
+            _logGeneric(localLog, `防守方 (${defenderName} - ${defenderWeaponDef.name}) 无特殊武器特性。`);
         }
         return { attackerPower, defenderPower, successRateMod, ignoresWounded, postCombatIgnoreWound, logEntries: localLog };
     }
 
-    localLog.push(`防守方 (${defender.nickname} - ${defenderWeaponDef.name}) 武器特性 [${defenderWeaponDef.passive || defenderWeaponDef.passiveType}] 发动...`);
+    const passiveName = defenderWeaponDef.passive || defenderWeaponDef.passiveType;
+    _logGeneric(localLog, `防守方 (${defenderName} - ${defenderWeaponDef.name}) 武器特性 [${passiveName}] 发动...`);
 
     switch (defenderWeaponDef.passiveType) {
         case "power_boost_flat":
-            defenderPower += (defenderWeaponDef.passiveValue || 0);
-            localLog.push(`  效果: 防御强化，威胁评估提升 ${defenderWeaponDef.passiveValue || 0}。`);
+            defenderPower = _applyPowerBoost(defenderPower, defenderWeaponDef.passiveValue, false, localLog, `${passiveName} (防御强化)`, defenderName, defenderWeaponDef.name);
             break;
-        case "power_boost_percentage": // 通用威力提升
-            defenderPower *= (1 + (defenderWeaponDef.passiveValue || 0));
-            localLog.push(`  效果: 防御系统超载，威胁评估提升 ${((defenderWeaponDef.passiveValue || 0) * 100).toFixed(0)}%。`);
+        case "power_boost_percentage":
+        case "power_boost_percentage_defense_only": // In this context, it's always defense
+            defenderPower = _applyPowerBoost(defenderPower, defenderWeaponDef.passiveValue, true, localLog, passiveName, defenderName, defenderWeaponDef.name);
             break;
-        case "power_boost_percentage_defense_only": // 仅防御时威力提升 (例如 "守护力场手套")
-            // 在此上下文中，持有者即为防守方，所以效果等同于 power_boost_percentage
-            const defenseBoostValue = defenderWeaponDef.passiveValue || 0;
-            defenderPower *= (1 + defenseBoostValue);
-            localLog.push(`  效果: [${defenderWeaponDef.passive}]激活，作为防守方时，威胁评估提升 ${(defenseBoostValue * 100).toFixed(0)}%。`);
-            break;
-        case "ignore_self_wounded_status": // (例如 "“不屈”核心")
+        case "ignore_self_wounded_status":
             ignoresWounded = true;
-            localLog.push(`  效果: 无视自身损伤，维持标准防御！`);
+            _logGeneric(localLog, `  特性[${passiveName}]@${defenderName}(${defenderWeaponDef.name}): 无视自身损伤，维持标准防御！`);
             break;
-        case "evasion_boost": // 闪避提升，降低攻击方成功率
-            successRateMod -= (defenderWeaponDef.passiveValue || 0.15);
-            localLog.push(`  效果: 采取规避机动，对方交战成功率降低 ${((defenderWeaponDef.passiveValue || 0.15) * 100).toFixed(0)}%。`);
+        case "evasion_boost": // Lowers attacker's success rate
+            successRateMod = _applySuccessRateModifier(successRateMod, -(defenderWeaponDef.passiveValue || 0.15), localLog, `${passiveName} (规避机动)`, defenderName, defenderWeaponDef.name);
             break;
-        case "critical_hit_success_boost": // 如果防御方武器有此特性
+        case "critical_hit_success_boost": // If defender weapon has this, it likely reduces attacker's success
             if (defenderWeaponDef.passiveValue && typeof defenderWeaponDef.passiveValue.successRateBonus === 'number') {
-                successRateMod -= defenderWeaponDef.passiveValue.successRateBonus;
-                localLog.push(`  特性[${defenderWeaponDef.passive || '精确防御'}]发动: 对方交战成功率受到压制，降低 ${(defenderWeaponDef.passiveValue.successRateBonus * 100).toFixed(0)}%。`);
+                successRateMod = _applySuccessRateModifier(successRateMod, -defenderWeaponDef.passiveValue.successRateBonus, localLog, `${passiveName} (精确防御)`, defenderName, defenderWeaponDef.name);
             } else {
-                localLog.push(`  特性[${defenderWeaponDef.passive || '精确防御'}]发动失败 (参数配置错误)。`);
+                _logGeneric(localLog, `  特性[${passiveName}]@${defenderName}(${defenderWeaponDef.name}) 发动失败 (参数配置错误)。`);
             }
             break;
-        case "escape_boost_post_combat": // 战后逃跑率提升 (例如 "“幽灵”披风")
-            localLog.push(`  特性[${defenderWeaponDef.passive || '紧急脱离'}]准备就绪，战败后更容易脱离。`);
-            // 实际效果由 gameHandler 处理
+        case "escape_boost_post_combat":
+            _logGeneric(localLog, `  特性[${passiveName}]@${defenderName}(${defenderWeaponDef.name}) 准备就绪，战败后更容易脱离。`);
+            // Actual effect handled by gameHandler
             break;
-        case "post_combat_ignore_wound": // 战后免伤 (例如 "“求生者”工具包")
+        case "post_combat_ignore_wound":
             postCombatIgnoreWound = true;
-            localLog.push(`  特性效果: [${defenderWeaponDef.passive}]预备应急措施，即使战败也能维持行动力。`);
+            _logGeneric(localLog, `  特性[${passiveName}]@${defenderName}(${defenderWeaponDef.name}) 预备应急措施，即使战败也能维持行动力。`);
             break;
-        // 旧版兼容
-        // "偏折力场" -> power_boost_percentage_defense_only
         default:
-            localLog.push(`  未知的防守方武器被动类型: ${defenderWeaponDef.passiveType}。`);
+            _logGeneric(localLog, `  未知的防守方武器被动类型: ${defenderWeaponDef.passiveType} @${defenderName}(${defenderWeaponDef.name})。`);
     }
-    attackerPower = Math.max(0, Math.round(attackerPower));
-    defenderPower = Math.max(0, Math.round(defenderPower));
-    return { attackerPower, defenderPower, successRateMod, ignoresWounded, postCombatIgnoreWound, logEntries: localLog };
+    return { attackerPower: Math.max(0, Math.round(attackerPower)), defenderPower: Math.max(0, Math.round(defenderPower)), successRateMod, ignoresWounded, postCombatIgnoreWound, logEntries: localLog };
 }
 
 
@@ -229,46 +289,47 @@ export function applyDefenderWeaponPassives(defender, attacker, defenderWeaponDe
  * @param {boolean} isNpcAttackingContext - NPC是否为当前评估上下文中的攻击方.
  * @param {number} initialNpcPower - NPC应用被动前的基础战力。
  * @param {number} initialOpponentPower - 对手应用被动前的基础战力。
- * @param {Array<string>} combatLog - 战斗日志数组。
  * @returns {object} 包含对战力、成功率、特殊标志等的修改。
  */
-export function applyNpcCombatPassives(npc, opponent, isNpcAttackingContext, initialNpcPower, initialOpponentPower, combatLog) {
+export function applyNpcCombatPassives(npc, opponent, isNpcAttackingContext, initialNpcPower, initialOpponentPower) {
     let npcPower = initialNpcPower;
     let opponentPower = initialOpponentPower;
     let successRateMod = 0;
-    let npcSuppressionMaxRate;
+    let npcSuppressionMaxRate; // This is the max success rate the OPPONENT can achieve against this NPC, or this NPC can achieve if specified.
     const localLog = [];
+    const npcName = npc.nickname || 'NPC';
 
-    if (!npc.isNpc || !npc.combatPassive || !npc.combatPassive.type) {
+    if (!npc.isNpc || !npc.combatPassive || !npc.combatPassive.type || npc.combatPassive.type === "none") {
         return { npcPower, opponentPower, successRateMod, npcSuppressionMaxRate, logEntries: localLog };
     }
 
-    localLog.push(`NPC (${npc.nickname}) 固有能力 [${npc.combatPassive.name || npc.combatPassive.type}] 发动...`);
+    const passiveName = npc.combatPassive.name || npc.combatPassive.type;
+    _logGeneric(localLog, `NPC (${npcName}) 固有能力 [${passiveName}] 发动...`);
 
     switch (npc.combatPassive.type) {
-        case "suppression":
-            const npcBaseForCondition = npc.weapon?.baseCombatPower || npc.baseCombatPower || 0;
-            const opponentBaseForCondition = opponent.weapon?.baseCombatPower || opponent.baseCombatPower || 0;
+        case "suppression": // NPC's passive limits opponent's success rate if NPC's base power is higher
+            const npcBaseForCondition = npc.weapon?.baseCombatPower || npc.npcDefinition?.baseCombatPower || 0;
+            const opponentBaseForCondition = opponent.weapon?.baseCombatPower || (opponent.isNpc ? opponent.npcDefinition?.baseCombatPower : 0) || 0;
 
             if (opponentBaseForCondition < npcBaseForCondition) {
+                // This means the opponent's success rate against this NPC (if NPC is defender)
+                // or this NPC's success rate against the opponent (if NPC is attacker and passive is worded that way)
+                // is capped. The variable name in combatHelper expects it as "opponent's max success rate".
                 npcSuppressionMaxRate = npc.combatPassive.details?.maxSuccessRateForOpponent || 0.4;
-                localLog.push(`  效果: ${npc.combatPassive.description || `强大的气场压制对手，对手的最终战斗成功率不会超过 ${(npcSuppressionMaxRate*100).toFixed(0)}%`}`);
+                _logGeneric(localLog, `  效果: ${npc.combatPassive.description || `强大的气场压制对手，对手的最终战斗成功率不会超过 ${(npcSuppressionMaxRate*100).toFixed(0)}%`}`);
             } else {
-                localLog.push(`  效果条件未满足（目标基础战力不低于自身）。`);
+                _logConditionNotMet(localLog, passiveName, npcName, "固有能力", "目标基础战力不低于自身");
             }
             break;
         case "power_surge_on_engage":
             const boost = npc.combatPassive.details?.powerBoost || 0;
-            npcPower += boost;
-            localLog.push(`  效果: ${npc.combatPassive.description || `战斗核心过载，威胁评估提升 ${boost}。`}`);
+            npcPower = _applyPowerBoost(npcPower, boost, false, localLog, passiveName, npcName, "固有能力");
             break;
-        case "master_escape":
-            localLog.push(`  效果: ${npc.combatPassive.description || '逃跑大师特性'} (战前已进行判定)`);
+        case "master_escape": // Pre-combat escape logic is in gameHandler.js
+            _logGeneric(localLog, `  效果: ${npc.combatPassive.description || '逃跑大师特性'} (战前已进行判定)`);
             break;
         default:
-            localLog.push(`  未知的NPC固有能力类型: ${npc.combatPassive.type}。`);
+            _logGeneric(localLog, `  未知的NPC固有能力类型: ${npc.combatPassive.type} @${npcName}。`);
     }
-    npcPower = Math.max(0, Math.round(npcPower));
-    opponentPower = Math.max(0, Math.round(opponentPower));
-    return { npcPower, opponentPower, successRateMod, npcSuppressionMaxRate, logEntries: localLog };
+    return { npcPower: Math.max(0, Math.round(npcPower)), opponentPower: Math.max(0, Math.round(opponentPower)), successRateMod, npcSuppressionMaxRate, logEntries: localLog };
 }
