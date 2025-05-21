@@ -22,35 +22,35 @@
   },
   {
     "name": "加密数据盘",
-    "price": 40,
+    "price": 140,
     "rarity": "稀有",
     "type": "item",
     "description": "一块无法直接读取的数据盘，表面覆盖着复杂的加密纹路。"
   },
   {
     "name": "“呢喃”石块",
-    "price": 80,
+    "price": 180,
     "rarity": "稀有",
     "type": "item",
     "description": "握在手中时能听到微弱、无法理解的低语，来源不明。"
   },
   {
     "name": "认知滤镜碎片",
-    "price": 150,
+    "price": 550,
     "rarity": "罕见",
     "type": "item",
     "description": "一种能扭曲或修正感官输入的装置残片，效果未知。"
   },
   {
     "name": "“代价”契约残页",
-    "price": 280,
+    "price": 580,
     "rarity": "罕见",
     "type": "item",
     "description": "某种古老契约的一部分，上面用无法解读的文字书写着索取与给予的条款。"
   },
   {
     "name": "“观测者”之眼",
-    "price": 900,
+    "price": 1900,
     "rarity": "史诗",
     "type": "item",
     "description": "一颗冰冷的机械义眼，据说能洞察常人无法感知的“真实”。"
@@ -71,7 +71,7 @@
   },
   {
     "name": "“都市之星”碎片",
-    "price": 7000,
+    "price": 5000,
     "rarity": "传奇",
     "type": "item",
     "description": "传说中支撑着这座无尽都市运转的“星”的微小残片，蕴含着难以想象的力量。"
@@ -113,14 +113,14 @@
   },
   {
     "name": "一袋可疑零件",
-    "price": 5000,
+    "price": 15000,
     "rarity": "收藏品",
     "type": "collectible",
     "description": "从【街边收尾人】杰克处获得的零件，用途不明，但或许能在黑市卖点小钱。"
   },
   {
     "name": "黑市通行证（伪）",
-    "price": 25000,
+    "price": 15000,
     "rarity": "收藏品",
     "type": "collectible",
     "description": "一张伪造的黑市通行证，做工粗糙，但或许能唬住一些守卫。"
