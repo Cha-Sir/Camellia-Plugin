@@ -1,11 +1,15 @@
 // camellia-plugin/utils/dataManager.js
 import fs from 'fs-extra';
 import path from 'path';
-import { INITIAL_WEAPON_NAME, VALID_STRATEGIES } from './constants.js';
+import { INITIAL_WEAPON_NAME, VALID_STRATEGIES, DAILY_SEED_SHOP_FILE_NAME } from './constants.js'
 
 const _path = process.cwd();
 const pluginRootPath = path.join(_path, 'plugins', 'camellia-plugin');
 const pluginDataDir = path.join(pluginRootPath, 'data');
+const DAILY_SEED_SHOP_FILE = path.join(pluginDataDir, DAILY_SEED_SHOP_FILE_NAME); // 新增
+
+// ... (之前的数据变量声明) ...
+let dailySeedShopData = { lastRefreshDate: "", items: [] }; // 新增
 
 try {
     fs.ensureDirSync(pluginDataDir);
@@ -54,7 +58,8 @@ async function loadAllBaseData() {
         titlesData = await fs.readJson(TITLE_FILE, { throws: false }) || [];
         npcsData = await fs.readJson(NPC_FILE, { throws: false }) || [];
         mercenariesData = await fs.readJson(MERCENARY_FILE, { throws: false }) || [];
-
+        dailySeedShopData = await fs.readJson(DAILY_SEED_SHOP_FILE, { throws: false }) || { lastRefreshDate: "", items: [] };
+        if (!dailySeedShopData.items) dailySeedShopData.items = [];
         if (await fs.pathExists(ACTIVITY_TEXT_FILE)) {
             currentActivityText = await fs.readFile(ACTIVITY_TEXT_FILE, 'utf-8');
         } else {
@@ -72,7 +77,7 @@ async function loadAllBaseData() {
         if (titlesData.length === 0) currentLogger.info('[AdventureGame/DataManager] 提示: titles.json 为空或加载失败。');
         if (npcsData.length === 0) currentLogger.warn('[AdventureGame/DataManager] 警告: npcs.json 为空或加载失败 (NPC系统可能无法正常运作)。');
         if (mercenariesData.length === 0) currentLogger.warn('[AdventureGame/DataManager] 警告: mercenaries.json 为空或加载失败 (佣兵系统可能无法正常运作)。');
-
+        if (!dailySeedShopData.lastRefreshDate) currentLogger.info('[AdventureGame/DataManager] 提示: dailySeedShop.json 为空或首次加载，商店将在首次访问时刷新。');
 
         let initialWeapon = weaponsData.find(w => w.name === INITIAL_WEAPON_NAME);
         if (!initialWeapon) {
@@ -112,9 +117,21 @@ function getTitles() { return titlesData; }
 function getCurrentActivityText() { return currentActivityText; }
 function getNpcs() { return npcsData; }
 function getMercenaries() { return mercenariesData; }
+function getDailySeedShopData() { return dailySeedShopData; }
 
 export const mercenaryImagePath = path.join(pluginDataDir, 'mercenary_images');
 
+async function saveDailySeedShopData(data) { // 新增
+    const currentLogger = global.logger || console;
+    try {
+        await fs.writeJson(DAILY_SEED_SHOP_FILE, data, { spaces: 2 });
+        currentLogger.debug(`[AdventureGame/DataManager] 每日光之种商店数据已保存到 ${DAILY_SEED_SHOP_FILE}`);
+        return true;
+    } catch (error) {
+        currentLogger.error(`[AdventureGame/DataManager] 保存每日光之种商店数据到 ${DAILY_SEED_SHOP_FILE} 失败:`, error);
+        return false;
+    }
+}
 
 async function getPlayerData(userId, nickname = '') {
     const playerFile = path.join(playersDir, `${userId}.json`);
@@ -148,7 +165,10 @@ async function getPlayerData(userId, nickname = '') {
             arenaTeam: [],
             hasClaimedNewbieGift: false,
             lastFreeTenPullDate: "",
-            seedsOfLight: 0 // 新增：光之种
+            seedsOfLight: 0,
+            // 新增：5星保底相关字段
+            pityCounter5Star: 0,
+            current5StarBonusRate: 0.0
         };
         if (weaponsData.length === 0) await loadAllBaseData(); // Ensure base data is loaded for INITIAL_WEAPON_NAME
 
@@ -178,7 +198,10 @@ async function getPlayerData(userId, nickname = '') {
         if (!finalPlayerData.arenaTeam) finalPlayerData.arenaTeam = [];
         if (typeof finalPlayerData.hasClaimedNewbieGift === 'undefined') finalPlayerData.hasClaimedNewbieGift = false;
         if (typeof finalPlayerData.lastFreeTenPullDate === 'undefined') finalPlayerData.lastFreeTenPullDate = "";
-        if (typeof finalPlayerData.seedsOfLight === 'undefined') finalPlayerData.seedsOfLight = 0; // 新增字段初始化
+        if (typeof finalPlayerData.seedsOfLight === 'undefined') finalPlayerData.seedsOfLight = 0;
+        // 初始化老玩家的5星保底字段
+        if (typeof finalPlayerData.pityCounter5Star === 'undefined') finalPlayerData.pityCounter5Star = 0;
+        if (typeof finalPlayerData.current5StarBonusRate === 'undefined') finalPlayerData.current5StarBonusRate = 0.0;
 
 
         if (nickname && finalPlayerData.nickname !== nickname) {
@@ -244,4 +267,6 @@ export {
     savePlayerData,
     getAllPlayerData,
     pluginDataDir,
+    getDailySeedShopData, // 导出
+    saveDailySeedShopData,
 };

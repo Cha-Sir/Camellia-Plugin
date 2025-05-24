@@ -18,7 +18,7 @@ const gamePools = {};
 const playerQueueStatus = {};
 const QUEUE_CHECK_INTERVAL = 60 * 1000;
 const DEFAULT_NPC_FILL_DELAY_MINUTES = 5;
-const PLUGIN_NAME = '都市迷踪（搜打撤）';
+const PLUGIN_NAME = '卡莫利安之旅（搜打撤）';
 
 let queueCheckIntervalId = null;
 let pluginAppInstance = null; // 用于存储插件主实例

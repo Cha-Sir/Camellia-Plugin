@@ -19,7 +19,7 @@ import * as arenaHandler from './handlers/arenaHandler.js';
 export class AdventureGame extends plugin {
     constructor() {
         super({
-            name: '都市迷踪（含佣兵竞技）',
+            name: '卡莫利安（含佣兵竞技）',
             dsc: '近未来都市的异常探索与佣兵竞技游戏。 #搜打撤帮助 查看指令',
             event: 'message',
             priority: 500,
@@ -79,6 +79,11 @@ export class AdventureGame extends plugin {
                 { reg: '^#佣兵配队\\s*([\\d,\\s，]+)$', fnc: 'setArenaTeam' },
                 { reg: '^#加入竞技场$', fnc: 'joinArena' },
                 { reg: '^#退出竞技场队列$', fnc: 'leaveArenaQueue' },
+                { reg: '^#光之种商店$', fnc: 'viewSeedShop' },
+                {
+                    reg: '^#购买\\s*(.+)$', // 通用购买，目前主要用于光之种商店
+                    fnc: 'buyFromSeedShop',
+                    priority: 501,}
             ]
         });
         this.initializePluginSystems();
@@ -154,4 +159,6 @@ export class AdventureGame extends plugin {
     async setArenaTeam(e) { return await arenaHandler.handleSetArenaTeam(e, this); }
     async joinArena(e) { return await arenaHandler.handleJoinArena(e, this); }
     async leaveArenaQueue(e) { return await arenaHandler.handleLeaveArenaQueue(e, this); }
+    async viewSeedShop(e) { return await shopHandler.handleViewSeedShop(e, this); }
+    async buyFromSeedShop(e) { return await shopHandler.handleBuyFromSeedShop(e, this); }
 }

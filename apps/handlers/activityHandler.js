@@ -22,7 +22,7 @@ export async function handleViewCurrentActivity(e, pluginInstance) {
         return e.reply("获取活动信息失败，或当前没有活动。");
     }
 
-    const title = "都市迷踪 - 当前活动公告";
+    const title = "卡莫利安 - 当前活动公告";
 
     // 如果消息过长，尝试使用转发消息发送
     if (activityText.length > MAX_MESSAGE_LENGTH && global.Bot && global.Bot.makeForwardMsg) {

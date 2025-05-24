@@ -42,7 +42,7 @@ export async function handleClaimNewbieGift(e, pluginInstance) {
     replyMsg += `【${playerData.nickname}】恭喜您获得 ${giftFunds} 启动资金！\n`;
     replyMsg += `同时获得 10 光之种，用于强化您的佣兵！\n`;
     replyMsg += `${giftedWeaponMsg}\n`;
-    replyMsg += `当前总资金: ${playerData.funds}。当前光之种: ${playerData.seedsOfLight}。\n祝您在都市的探索一帆风顺！`;
+    replyMsg += `当前总资金: ${playerData.funds}。当前光之种: ${playerData.seedsOfLight}。\n祝您在卡莫利安的探索一帆风顺！`;
 
     return e.reply(replyMsg);
 }
@@ -139,7 +139,7 @@ export async function handleViewMyInfo(e, pluginInstance) {
 }
 
 export async function handleShowHelp(e, pluginInstance) {
-    let helpMsg = "--- 都市迷踪与佣兵竞技行动手册 ---\n\n";
+    let helpMsg = "--- 卡莫利安与佣兵竞技行动手册 ---\n\n";
     helpMsg += "  #新手礼包 - (限领一次)获得启动资金、随机装备和少量光之种。\n";
     helpMsg += "【冒险准备 (搜打撤)】\n";
     helpMsg += "  #装备 武器名 - 设置默认地图武器。\n";
@@ -178,6 +178,7 @@ export async function handleShowHelp(e, pluginInstance) {
     helpMsg += "  #佣兵列表 - 查看您拥有的所有佣兵及其摘要(含光之种数量)。\n";
     helpMsg += "  #查看佣兵 [序号/名称] - 查看指定佣兵详细信息、图片及进阶消耗。\n";
     helpMsg += "  #进阶 [序号/名称] - 消耗光之种提升指定佣兵的进阶等级。\n\n";
+    helpMsg += "  #光之种商店 - 消耗光之种购买佣兵。\n\n";
 
 
     helpMsg += "【竞技场】\n";
@@ -194,7 +195,7 @@ export async function handleShowHelp(e, pluginInstance) {
         try {
             // For help, it's better to send it as one coherent block of text.
             // Pass as a single string in an array.
-            const forwardMsg = await makeForwardMsgWithContent([helpMsg.trim()], "都市迷踪行动手册");
+            const forwardMsg = await makeForwardMsgWithContent([helpMsg.trim()], "卡莫利安行动手册");
             if (forwardMsg) {
                 await e.reply(forwardMsg);
             } else {
@@ -229,7 +230,7 @@ export async function handleListMaps(e, pluginInstance) {
 
     if (global.Bot && global.Bot.makeForwardMsg) {
         try {
-            const forwardMsg = await makeForwardMsgWithContent([mapListText.trim()], "都市区域档案");
+            const forwardMsg = await makeForwardMsgWithContent([mapListText.trim()], "卡莫利安区域档案");
             if (forwardMsg) {
                 await e.reply(forwardMsg);
             } else {
@@ -283,7 +284,7 @@ export async function handleShowLeaderboard(e, pluginInstance) {
     const allGameWeapons = getWeapons();
 
     if (!allPlayersData || allPlayersData.length === 0) {
-        return e.reply("“都市财富榜”暂无数据。");
+        return e.reply("“卡莫利安财富榜”暂无数据。");
     }
 
     const leaderboard = allPlayersData.map(player => {
@@ -328,7 +329,7 @@ export async function handleShowLeaderboard(e, pluginInstance) {
     });
     if (global.Bot && global.Bot.makeForwardMsg) {
         try {
-            const forwardMsg = await makeForwardMsgWithContent([leaderboardText.trim()], "都市财富榜");
+            const forwardMsg = await makeForwardMsgWithContent([leaderboardText.trim()], "卡莫利安财富榜");
             if (forwardMsg) {
                 await e.reply(forwardMsg);
             } else {

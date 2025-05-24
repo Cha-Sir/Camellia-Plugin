@@ -103,3 +103,18 @@ export const MERCENARY_EVOLUTION_COST_SEED_OF_LIGHT = {
     4: 50,
     5: 150
 };
+export const PITY_5STAR_THRESHOLD = 60;
+// 超过阈值后，每次招募额外增加的5星概率
+export const PITY_5STAR_RATE_INCREMENT = 0.02;
+export const SEED_SHOP_REFRESH_HOUR_UTC = 0; // UTC时间的0点刷新，可根据需要调整为服务器本地时间的特定小时
+
+export const SEED_SHOP_CONFIG = {
+    slots: [
+        { rarity: 5, count: 1, price: 200 },
+        { rarity: 4, count: 2, price: 100 },
+        { rarity: 3, count: 3, price: 50 }
+    ]
+};
+
+// 用于在 dataManager 中定义文件名
+export const DAILY_SEED_SHOP_FILE_NAME = 'dailySeedShop.json';

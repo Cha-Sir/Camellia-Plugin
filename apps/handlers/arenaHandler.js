@@ -46,26 +46,50 @@ export async function handleSetArenaTeam(e, pluginInstance) {
     }
 
     const newTeamMercenaryIds = [];
-    const allMercenariesDefs = getMercenaries();
-    const playerOwnedMercsWithDetails = playerData.mercenaries.map(owned => {
-        const def = allMercenariesDefs.find(m => m.id === owned.mercenaryId);
-        return { ...owned, def };
-    }).filter(m => m.def);
+    const allMercenariesDefs = getMercenaries(); // 获取所有佣兵定义
+
+    // --- START OF FIX ---
+    // 获取并排序玩家拥有的佣兵列表，确保与 #佣兵列表 的显示顺序一致
+    // 这个列表将包含佣兵的持有信息 (owned) 和完整定义 (def)
+    const playerOwnedMercsForSelection = playerData.mercenaries
+        .map(owned => {
+            const def = allMercenariesDefs.find(m => m.id === owned.mercenaryId);
+            return { ...owned, def }; // 将持有的佣兵数据与完整定义合并
+        })
+        .filter(m => m.def) // 确保佣兵定义存在，以防数据不一致
+        .sort((a, b) => {
+            // 应用与 handleListPlayerMercenaries (以及 handleViewMercenaryDetail) 中相同的排序逻辑:
+            // 1. 按稀有度降序 (高星在前)
+            // 2. 相同稀有度下，按进阶等级降序 (高等级在前)
+            if (b.def.rarity !== a.def.rarity) {
+                return b.def.rarity - a.def.rarity;
+            }
+            return b.evolutionLevel - a.evolutionLevel;
+        });
+    // --- END OF FIX ---
+
 
     const chosenTeamNames = [];
     const uniqueCheck = new Set();
 
-    for (const index of selectedIndices) {
-        if (isNaN(index) || index < 0 || index >= playerOwnedMercsWithDetails.length) {
+    for (const index of selectedIndices) { // selectedIndices 是 (玩家输入序号 - 1)
+        // --- MODIFIED PART ---
+        // 从排序后的列表 playerOwnedMercsForSelection 中获取佣兵
+        if (isNaN(index) || index < 0 || index >= playerOwnedMercsForSelection.length) {
+            // --- END OF MODIFIED PART ---
             return e.reply(`输入的选择序号 "${index + 1}" 无效。请使用 #佣兵列表 查看您的佣兵及其序号。`);
         }
-        const selectedMerc = playerOwnedMercsWithDetails[index];
-        if (uniqueCheck.has(selectedMerc.mercenaryId)) {
-            return e.reply(`队伍中不能包含重复的佣兵。佣兵 "${selectedMerc.def.name}" 被选择了多次。`);
+        // --- MODIFIED PART ---
+        const selectedMercData = playerOwnedMercsForSelection[index]; // 从排序后的列表获取
+        // selectedMercData 现在的结构是 { mercenaryId, evolutionLevel, def: MercDefinition }
+        // --- END OF MODIFIED PART ---
+
+        if (uniqueCheck.has(selectedMercData.mercenaryId)) {
+            return e.reply(`队伍中不能包含重复的佣兵。佣兵 "${selectedMercData.def.name}" 被选择了多次。`);
         }
-        uniqueCheck.add(selectedMerc.mercenaryId);
-        newTeamMercenaryIds.push(selectedMerc.mercenaryId);
-        chosenTeamNames.push(selectedMerc.def.name);
+        uniqueCheck.add(selectedMercData.mercenaryId);
+        newTeamMercenaryIds.push(selectedMercData.mercenaryId);
+        chosenTeamNames.push(selectedMercData.def.name);
     }
 
     playerData.arenaTeam = newTeamMercenaryIds;

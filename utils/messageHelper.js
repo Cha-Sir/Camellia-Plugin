@@ -93,7 +93,7 @@ export async function makeForwardMsgWithContent(contentArray, title = "都市情
         if (textOnlyContent) {
             return `${title}:\n${textOnlyContent.substring(0, 1000)}\n...(图片功能异常，仅显示文本内容)`;
         }
-        return "[都市迷踪] 消息组件异常，无法生成转发消息。";
+        return "[卡莫利安] 消息组件异常，无法生成转发消息。";
     }
 
     if (!contentArray || contentArray.length === 0) {
@@ -216,7 +216,7 @@ export async function makeForwardMsgWithContent(contentArray, title = "都市情
 
             if (validNodes.length === 0) {
                 currentLogger.warn(`[MessageHelper] No valid forward message nodes were generated for title "${title}".`);
-                return "[都市迷踪] 记录为空或无效。";
+                return "[卡莫利安系统] 记录为空或无效。";
             }
             return await global.Bot.makeForwardMsg(validNodes);
         } catch (error) {
@@ -233,11 +233,11 @@ export async function makeForwardMsgWithContent(contentArray, title = "都市情
                 }
                 return `${title}:\n${fallbackMessageContent.substring(0, 500)}\n...(消息过长或转发生成失败，仅显示部分内容)`;
             }
-            return "[都市迷踪] 消息生成失败，详情请查看日志。";
+            return "[卡莫利安] 消息生成失败，详情请查看日志。";
         }
     } else if (forwardMsgNodes.length === 0) {
         currentLogger.warn(`[MessageHelper] No forward message nodes were generated for title "${title}".`);
-        return "[都市迷踪] 记录为空。";
+        return "[卡莫利安] 记录为空。";
     } else {
         // Fallback for no global.Bot.makeForwardMsg
         currentLogger.error(`[MessageHelper] global.Bot or global.Bot.makeForwardMsg is not available.`);
