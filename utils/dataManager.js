@@ -147,7 +147,8 @@ async function getPlayerData(userId, nickname = '') {
             mercenaries: [],
             arenaTeam: [],
             hasClaimedNewbieGift: false,
-            lastFreeTenPullDate: "" // 新增：记录上次免费十连的日期 (YYYY-MM-DD)
+            lastFreeTenPullDate: "",
+            seedsOfLight: 0 // 新增：光之种
         };
         if (weaponsData.length === 0) await loadAllBaseData(); // Ensure base data is loaded for INITIAL_WEAPON_NAME
 
@@ -176,7 +177,8 @@ async function getPlayerData(userId, nickname = '') {
         if (!finalPlayerData.mercenaries) finalPlayerData.mercenaries = [];
         if (!finalPlayerData.arenaTeam) finalPlayerData.arenaTeam = [];
         if (typeof finalPlayerData.hasClaimedNewbieGift === 'undefined') finalPlayerData.hasClaimedNewbieGift = false;
-        if (typeof finalPlayerData.lastFreeTenPullDate === 'undefined') finalPlayerData.lastFreeTenPullDate = ""; // 新增字段初始化
+        if (typeof finalPlayerData.lastFreeTenPullDate === 'undefined') finalPlayerData.lastFreeTenPullDate = "";
+        if (typeof finalPlayerData.seedsOfLight === 'undefined') finalPlayerData.seedsOfLight = 0; // 新增字段初始化
 
 
         if (nickname && finalPlayerData.nickname !== nickname) {

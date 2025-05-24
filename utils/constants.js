@@ -80,3 +80,26 @@ export const ARENA_BATTLE_MIN_TURNS = 3;
 export const ARENA_BATTLE_MAX_TURNS = 5;
 
 export const TEN_PULL_GUARANTEE_MIN_RARITY = 3;
+// --- 光之种系统常量 ---
+/**
+ * 重复获得已满级佣兵时，根据稀有度（3星及以上）获得的光之种数量
+ * @type {Object<number, number>} 格式: { Rarity: SeedsGained }
+ */
+export const SEED_OF_LIGHT_GAIN_ON_DUPLICATE = {
+    3: 1,
+    4: 10,
+    5: 50
+};
+
+export const MERCENARY_MAX_LEVEL_DUPLICATE_REWARD_LOW_RARITY = 50;
+/**
+ * 佣兵进阶消耗的光之种数量，基于佣兵的【基础稀有度】
+ * @type {Object<number, number>} 格式: { Rarity: CostPerEvolution }
+ */
+export const MERCENARY_EVOLUTION_COST_SEED_OF_LIGHT = {
+    1: 1,
+    2: 1,
+    3: 10,
+    4: 50,
+    5: 150
+};

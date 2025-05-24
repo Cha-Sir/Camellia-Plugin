@@ -107,7 +107,7 @@ async function checkAndFillQueuesWithNpcs() {
                 const neededNpcs = pool.mapInfo.playerCapacity - pool.players.length;
                 const availableNpcIdsOnMap = pool.mapInfo.availableNpcIds || [];
                 let spawnedNpcCount = 0;
-                const tempPlayerForNotification = pool.players.find(p => !p.isNpc);
+                const tempPlayerForNotification = pool.players.find(p => !p.isNpc && p.e); // 找到有 e 对象的真实玩家
 
                 if (availableNpcIdsOnMap.length > 0 && neededNpcs > 0) {
                     for (let i = 0; i < neededNpcs; i++) {
@@ -132,27 +132,37 @@ async function checkAndFillQueuesWithNpcs() {
                     pool.gameProcessLog.push(`[系统提示] 由于等待超时，${spawnedNpcCount}名NPC调查员(${timeoutSpawnedNpcNames.join('、 ')})已加入队伍！`);
                 }
 
-                if (pool.players.length >= pool.mapInfo.playerCapacity) {
-                    // 确保在调用 processGameInstance 时传递 currentPluginInstance
-                    if (currentPluginInstance || pool.players.every(p => p.isNpc)) {
-                        if (spawnedNpcCount > 0 && tempPlayerForNotification && tempPlayerForNotification.groupId && global.Bot && global.Bot.pickGroup) {
-                            const groupToNotify = global.Bot.pickGroup(tempPlayerForNotification.groupId);
-                            if (groupToNotify && typeof groupToNotify.sendMsg === 'function') {
-                                let immediateMsg = `[${mapName}] 探索队伍已满员！`;
-                                if (timeoutSpawnedNpcNames.length > 0) {
-                                    immediateMsg += ` 由 ${timeoutSpawnedNpcNames.join('、 ')} 等自动填充。即将开始探索...`;
-                                } else {
-                                    immediateMsg += ` 即将开始探索...`;
-                                }
-                                await groupToNotify.sendMsg(immediateMsg).catch(err => logger.error(`[GameHandler] 发送NPC超时填充消息错误: ${err}`));
-                            }
+                if (spawnedNpcCount > 0 && tempPlayerForNotification) {
+                    let immediateMsg = `[${mapName}] 探索队伍已满员！`;
+                    if (timeoutSpawnedNpcNames.length > 0) {
+                        immediateMsg += ` 由 ${timeoutSpawnedNpcNames.join('、 ')} 等自动填充。即将开始探索...`;
+                    } else {
+                        immediateMsg += ` 即将开始探索...`;
+                    }
+                    if (tempPlayerForNotification.groupId && global.Bot && global.Bot.pickGroup) {
+                        const groupToNotify = global.Bot.pickGroup(tempPlayerForNotification.groupId);
+                        if (groupToNotify && typeof groupToNotify.sendMsg === 'function') {
+                            await groupToNotify.sendMsg(immediateMsg).catch(err => logger.error(`[GameHandler] 发送NPC超时填充消息错误 (群聊): ${err}`));
                         }
-                        await processGameInstance(mapName, currentPluginInstance); // 传递获取到的实例
+                    } else if (tempPlayerForNotification.e && typeof tempPlayerForNotification.e.reply === 'function') { // 私聊
+                        await tempPlayerForNotification.e.reply(immediateMsg).catch(err => logger.error(`[GameHandler] 发送NPC超时填充消息错误 (私聊): ${err}`));
+                    }
+                }
+
+
+                if (pool.players.length >= pool.mapInfo.playerCapacity) {
+                    if (currentPluginInstance || pool.players.every(p => p.isNpc)) {
+                        await processGameInstance(mapName, currentPluginInstance);
                     } else {
                         logger.error(`[GameHandler] 无法启动地图 "${mapName}" 的游戏 (NPC超时填充后)，因为缺少插件实例且队列中有真实玩家。`);
-                        if (tempPlayerForNotification && tempPlayerForNotification.groupId && global.Bot && global.Bot.pickGroup) {
-                            const groupToNotify = global.Bot.pickGroup(tempPlayerForNotification.groupId);
-                            if (groupToNotify) await groupToNotify.sendMsg(`[${mapName}] 探索启动失败：系统组件错误，无法自动开始。请尝试重新加入或联系管理员。`).catch(e => {});
+                        if (tempPlayerForNotification) {
+                            const errorMsg = `[${mapName}] 探索启动失败：系统组件错误，无法自动开始。请尝试重新加入或联系管理员。`;
+                            if (tempPlayerForNotification.groupId && global.Bot && global.Bot.pickGroup) {
+                                const groupToNotify = global.Bot.pickGroup(tempPlayerForNotification.groupId);
+                                if (groupToNotify) await groupToNotify.sendMsg(errorMsg).catch(e => {});
+                            } else if (tempPlayerForNotification.e && typeof tempPlayerForNotification.e.reply === 'function') { //私聊
+                                await tempPlayerForNotification.e.reply(errorMsg).catch(e => {});
+                            }
                         }
                     }
                 }
@@ -204,7 +214,8 @@ function createNpcPlayerObject(npcDef, allWeaponDefs, spawnedByRandomEvent = fal
         temporaryFunds: 0,
         status: 'active',
         actionsTaken: 0,
-        groupId: null,
+        groupId: null, // NPCs don't have a specific groupID in this context
+        e: null, // NPCs don't have an 'e' object
         initialHeldWeapons: npcWeaponResolved ? [npcWeaponResolved.name] : [],
         hostility: npcDef.hostility,
         combatPassive: npcDef.combatPassive ? JSON.parse(JSON.stringify(npcDef.combatPassive)) : null,
@@ -215,9 +226,8 @@ function createNpcPlayerObject(npcDef, allWeaponDefs, spawnedByRandomEvent = fal
 
 export async function handleEnterMap(e, pluginInstanceFromApp) {
     const userId = e.user_id;
-    const groupId = e.group_id;
+    const groupId = e.group_id; // Will be undefined in private chat
     const rawNickname = e.sender.card || e.sender.nickname || `调查员${String(userId).slice(-4)}`;
-    // 优先使用传入的实例
     const currentPluginInstance = pluginInstanceFromApp || pluginAppInstance || getPluginInstanceFallback();
 
 
@@ -236,7 +246,6 @@ export async function handleEnterMap(e, pluginInstanceFromApp) {
     let weaponNameInput = match[2];
     let strategyInput = match[3];
 
-    // 使用 currentPluginInstance 调用 getPlayer
     const { playerData } = await currentPluginInstance.getPlayer(userId, rawNickname);
     if (!playerData) return e.reply("抱歉，您的身份识别出现错误，无法同步档案。");
 
@@ -361,11 +370,14 @@ export async function handleEnterMap(e, pluginInstanceFromApp) {
         temporaryFunds: 0,
         status: initialStatusInGame,
         actionsTaken: 0,
-        groupId: groupId,
+        groupId: groupId, // This will be e.group_id
+        e: e,             // Store the full event object
         initialHeldWeapons: [...playerData.heldWeapons]
     };
     pool.players.push(playerInGame);
-    pool.playerGroupIds[userId] = groupId;
+    if (groupId) { // Only store in playerGroupIds if it's a group context
+        pool.playerGroupIds[userId] = groupId;
+    }
     playerQueueStatus[userId] = mapName;
 
     let joinMessage = `${getFormattedNickname(playerInGame)} 已装备 "${finalWeaponName}"`;
@@ -421,7 +433,7 @@ export async function handleEnterMap(e, pluginInstanceFromApp) {
 
     if (pool.players.length === selectedMap.playerCapacity) {
         pool.players.forEach(p => { if (p.isNpc) p.justSpawnedRandomly = false; });
-        await processGameInstance(mapName, currentPluginInstance); // 传递获取到的实例
+        await processGameInstance(mapName, currentPluginInstance);
     }
     return true;
 }
@@ -451,7 +463,7 @@ export async function handleLeaveQueue(e, pluginInstanceFromApp) {
         return e.reply(`在 "${mapName}" 的队列中未找到您的记录。`);
     }
 
-    const { playerData } = await currentPluginInstance.getPlayer(userId); // 使用 currentPluginInstance
+    const { playerData } = await currentPluginInstance.getPlayer(userId);
     const playerInGame = pool.players[playerIndex];
 
     if (playerData && pool.mapInfo.entryFee > 0) {
@@ -464,7 +476,10 @@ export async function handleLeaveQueue(e, pluginInstanceFromApp) {
 
     pool.players.splice(playerIndex, 1);
     delete playerQueueStatus[userId];
-    delete pool.playerGroupIds[userId];
+    if (playerInGame.groupId) { // If player was in a group context
+        delete pool.playerGroupIds[userId];
+    }
+
 
     if (pool.players.filter(p => !p.isNpc).length === 0 && !pool.npcsSpawnedThisInstance) {
         pool.queueStartTime = Date.now();
@@ -474,8 +489,6 @@ export async function handleLeaveQueue(e, pluginInstanceFromApp) {
 }
 
 export async function handleViewQueues(e, pluginInstanceFromApp) {
-    // This function is informational and doesn't strictly need the plugin instance for its core logic
-    // unless it were to fetch player names/details dynamically, which it currently doesn't for queue view.
     let replyMsg = "--- 当前地图待命队列 ---";
     let hasQueues = false;
 
@@ -573,7 +586,7 @@ async function performCombat(attacker, defender, pool, allWeapons, pluginInstanc
             loser.status = 'defeated';
             if (loser.isNpc && loser.npcDefinition?.dialogue?.onDefeat) pool.gameProcessLog.push(`  🗣️ [${loserDisplayNameForLog}]: "${loser.npcDefinition.dialogue.onDefeat}"`);
             pool.gameProcessLog.push(`  [${loserDisplayNameForLog}] 已受重创，不敌对手，被迫退出探索！`);
-            if (currentPluginInstance || winner.isNpc) await transferSpoils(winner, loser, pool, currentPluginInstance, allWeapons); // Pass instance
+            if (currentPluginInstance || winner.isNpc) await transferSpoils(winner, loser, pool, currentPluginInstance, allWeapons);
             else pool.gameProcessLog.push(`  [系统警告] 由于核心组件错误，无法处理战利品转移。`);
 
         } else {
@@ -610,7 +623,7 @@ async function performCombat(attacker, defender, pool, allWeapons, pluginInstanc
                     loser.status = 'defeated';
                     if (loser.isNpc && loser.npcDefinition?.dialogue?.onDefeat) pool.gameProcessLog.push(`  🗣️ [${loserDisplayNameForLog}]: "${loser.npcDefinition.dialogue.onDefeat}"`);
                     pool.gameProcessLog.push(`  [${loserDisplayNameForLog}] 未能成功脱离，被 [${winnerDisplayName}] 击倒！`);
-                    if (currentPluginInstance || winner.isNpc) await transferSpoils(winner, loser, pool, currentPluginInstance, allWeapons); // Pass instance
+                    if (currentPluginInstance || winner.isNpc) await transferSpoils(winner, loser, pool, currentPluginInstance, allWeapons);
                     else pool.gameProcessLog.push(`  [系统警告] 由于核心组件错误，无法处理战利品转移。`);
                 }
             }
@@ -619,8 +632,6 @@ async function performCombat(attacker, defender, pool, allWeapons, pluginInstanc
 }
 
 async function performSearchAction(playerInGame, pool, allItems, allWeapons, publicItemsPool, gameLogArray, pluginInstanceFromCaller) {
-    // This function primarily modifies playerInGame object and gameLogArray,
-    // pluginInstance is not strictly needed here unless future logic requires it (e.g., complex item interactions)
     const itemsToObtainCount = Math.floor(Math.random() * 2) + 1;
     let foundItemsMsgParts = [];
     const mapInfo = pool.mapInfo;
@@ -810,7 +821,7 @@ async function transferSpoils(winner, loser, pool, pluginInstanceFromCaller, all
         });
     }
 
-    if (!winner.isNpc && !loser.isNpc && currentPluginInstance) { // Check currentPluginInstance
+    if (!winner.isNpc && !loser.isNpc && currentPluginInstance) {
         const { playerData: loserStore } = await currentPluginInstance.getPlayer(loser.userId);
         const { playerData: winnerStore } = await currentPluginInstance.getPlayer(winner.userId);
 
@@ -852,9 +863,7 @@ async function transferSpoils(winner, loser, pool, pluginInstanceFromCaller, all
 
 export async function processGameInstance(mapName, pluginInstanceFromApp) {
     const pool = gamePools[mapName];
-    // 优先使用传入的实例，其次是模块级存储的，最后是回退方法
     const currentPluginInstance = pluginInstanceFromApp || pluginAppInstance || getPluginInstanceFallback();
-
 
     if (!pool || pool.status !== 'waiting') {
         logger.warn(`[GameHandler] processGameInstance 被调用，但地图 "${mapName}" 不处于 'waiting' 状态或不存在。状态: ${pool?.status}`);
@@ -864,13 +873,16 @@ export async function processGameInstance(mapName, pluginInstanceFromApp) {
     }
     if (!currentPluginInstance && pool.players.some(p => !p.isNpc)) {
         logger.error(`[GameHandler - processGameInstance] 关键错误: 无法找到插件实例。涉及真实玩家的地图 ${mapName} 探索将失败。`);
-        const uniqueGroupIdsForError = [...new Set(pool.players.filter(p => !p.isNpc && p.groupId).map(p => p.groupId))];
-        for (const groupId of uniqueGroupIdsForError) {
-            if (global.Bot && global.Bot.pickGroup) {
-                const groupToNotify = global.Bot.pickGroup(groupId);
+        for (const player of pool.players) {
+            if (player.isNpc || !player.e) continue; // 只处理有 e 对象的真实玩家
+            const errorMsg = `[${mapName}] 探索启动失败：系统核心组件通讯异常。请联系管理员。`;
+            if (player.groupId && global.Bot && global.Bot.pickGroup) { // 群聊
+                const groupToNotify = global.Bot.pickGroup(player.groupId);
                 if (groupToNotify && typeof groupToNotify.sendMsg === 'function') {
-                    await groupToNotify.sendMsg(`[${mapName}] 探索启动失败：系统核心组件通讯异常。请联系管理员。`).catch(err => logger.error("发送关键失败消息错误:", err));
+                    await groupToNotify.sendMsg(errorMsg).catch(err => logger.error("发送关键失败消息错误 (群聊):", err));
                 }
+            } else if (player.e && typeof player.e.reply === 'function') { // 私聊
+                await player.e.reply(errorMsg).catch(err => logger.error("发送关键失败消息错误 (私聊):", err));
             }
         }
         delete gamePools[mapName];
@@ -975,20 +987,18 @@ export async function processGameInstance(mapName, pluginInstanceFromApp) {
 
         let playerSummary = `\n调查员: ${displayName} (编号: ...${String(p.userId).slice(-4)})\n  最终状态: `;
         let playerStorageData = null;
-        if (currentPluginInstance) { // 使用 currentPluginInstance
+        if (currentPluginInstance) {
             const { playerData: fetchedData } = await currentPluginInstance.getPlayer(p.userId);
             playerStorageData = fetchedData;
         }
 
-        if (!playerStorageData && currentPluginInstance) { // 检查 currentPluginInstance
+        if (!playerStorageData && currentPluginInstance) {
             logger.error(`[GameHandler] 结算阶段: 调查员 ${displayName} (${p.userId}) 档案同步失败。`);
             pool.settlementLog.push(playerSummary + "\n  结算失败：无法同步您的个人档案。");
-            // 不在此处 continue，允许记录部分信息，但后续保存会失败
-        } else if (!currentPluginInstance && !p.isNpc) { // 如果没有实例且是真实玩家
+        } else if (!currentPluginInstance && !p.isNpc) {
             logger.error(`[GameHandler] 结算阶段: 调查员 ${displayName} (${p.userId}) 因缺少插件实例而无法同步档案。`);
             pool.settlementLog.push(playerSummary + "\n  结算失败：核心组件通讯失败，无法同步您的个人档案。");
         }
-
 
         if (p.status === 'defeated') {
             playerSummary += "任务中断，信号消失";
@@ -999,7 +1009,7 @@ export async function processGameInstance(mapName, pluginInstanceFromApp) {
             }
         } else if (p.status === 'escaped') {
             playerSummary += "成功脱离区域";
-            if (playerStorageData && p.status === 'wounded') {
+            if (playerStorageData && p.status === 'wounded') { // This check might be redundant if escaped implies not wounded by definition
                 playerStorageData.permanentInjuryStatus = ['light', 'medium', 'heavy'][Math.floor(Math.random() * 3)];
                 playerStorageData.needsTreatment = true;
                 playerSummary += `\n  伤势评估: ${INJURY_LEVELS[playerStorageData.permanentInjuryStatus]?.name || playerStorageData.permanentInjuryStatus}，建议治疗。`;
@@ -1012,7 +1022,7 @@ export async function processGameInstance(mapName, pluginInstanceFromApp) {
                 playerStorageData.needsTreatment = true;
                 playerSummary += `\n  伤势评估: ${INJURY_LEVELS[playerStorageData.permanentInjuryStatus]?.name || playerStorageData.permanentInjuryStatus}，建议治疗。`;
             }
-        } else {
+        } else { // active
             playerSummary += "任务完成，安全返回";
         }
 
@@ -1079,26 +1089,56 @@ export async function processGameInstance(mapName, pluginInstanceFromApp) {
         }
 
         pool.settlementLog.push(playerSummary);
-        // 只有在有实例和玩家数据时才保存
         if (playerStorageData && currentPluginInstance) await savePlayerData(p.userId, playerStorageData);
     }
 
-    const uniqueGroupIds = [...new Set(pool.players.filter(p => !p.isNpc && p.groupId).map(p => p.groupId))];
-    for (const groupId of uniqueGroupIds) {
-        if (global.Bot && typeof global.Bot.pickGroup === 'function') {
-            const groupToNotify = global.Bot.pickGroup(groupId);
-            if (groupToNotify && typeof groupToNotify.sendMsg === 'function') {
-                if (pool.gameProcessLog.length > 0) {
-                    const gameProcessForwardMsg = await makeForwardMsgWithContent(pool.gameProcessLog, `探索行动记录: ${mapName}`);
-                    if (gameProcessForwardMsg) await groupToNotify.sendMsg(gameProcessForwardMsg).catch(err => logger.error(`发送游戏过程日志错误: ${err}`));
+    const sentToGroups = new Set(); // 跟踪已发送消息的群组ID
+
+    for (const player of pool.players) {
+        if (player.isNpc) continue; // 只处理真实玩家
+
+        let sendFunction = null;
+        let bindTarget = null;
+
+        if (player.groupId && global.Bot && global.Bot.pickGroup) { // 群聊
+            if (!sentToGroups.has(player.groupId)) {
+                const groupToNotify = global.Bot.pickGroup(player.groupId);
+                if (groupToNotify && typeof groupToNotify.sendMsg === 'function') {
+                    sendFunction = groupToNotify.sendMsg;
+                    bindTarget = groupToNotify;
+                    sentToGroups.add(player.groupId);
                 }
-                if (pool.settlementLog.length > 0) {
-                    const settlementForwardMsg = await makeForwardMsgWithContent(pool.settlementLog, `探索结算报告: ${mapName}`);
-                    if (settlementForwardMsg) await groupToNotify.sendMsg(settlementForwardMsg).catch(err => logger.error(`发送结算日志错误: ${err}`));
+            } else {
+                continue; // 该群组已发送过
+            }
+        } else if (player.e && typeof player.e.reply === 'function') { // 私聊
+            sendFunction = player.e.reply;
+            bindTarget = player.e; // e.reply is already bound or will be bound to e
+        }
+
+
+        if (sendFunction) {
+            if (pool.gameProcessLog.length > 0) {
+                const gameProcessForwardMsg = await makeForwardMsgWithContent(pool.gameProcessLog, `探索行动记录: ${mapName}`,false);
+                if (gameProcessForwardMsg) {
+                    await sendFunction.call(bindTarget, gameProcessForwardMsg).catch(err => logger.error(`发送游戏过程日志给 ${player.groupId || player.userId} 错误: ${err}`));
+                } else {
+                    logger.warn(`[GameHandler] 未能为 ${player.groupId || player.userId} 生成游戏过程转发消息。`);
                 }
             }
+            if (pool.settlementLog.length > 0) {
+                const settlementForwardMsg = await makeForwardMsgWithContent(pool.settlementLog, `探索结算报告: ${mapName}`,true);
+                if (settlementForwardMsg) {
+                    await sendFunction.call(bindTarget, settlementForwardMsg).catch(err => logger.error(`发送结算日志给 ${player.groupId || player.userId} 错误: ${err}`));
+                } else {
+                    logger.warn(`[GameHandler] 未能为 ${player.groupId || player.userId} 生成结算转发消息。`);
+                }
+            }
+        } else {
+            logger.error(`[GameHandler] 无法为玩家 ${player.userId} (群: ${player.groupId}) 找到有效的消息发送目标。`);
         }
     }
+
     delete gamePools[mapName];
     logger.info(`[GameHandler] 探索任务于区域 "${mapName}" 已结束并清理。`);
 }

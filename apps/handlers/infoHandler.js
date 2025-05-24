@@ -1,6 +1,6 @@
 // camellia-plugin/apps/handlers/infoHandler.js
 
-import { getPlayerData, savePlayerData, getMaps, getWeapons, getAllPlayerData, getTitles, getMercenaries } from '../../utils/dataManager.js'; // 导入 getMercenaries
+import { getPlayerData, savePlayerData, getMaps, getWeapons, getAllPlayerData, getTitles, getMercenaries } from '../../utils/dataManager.js';
 import { makeForwardMsgWithContent } from '../../utils/messageHelper.js';
 import { MAX_MESSAGE_LENGTH, VALID_STRATEGIES, INJURY_LEVELS, INITIAL_WEAPON_NAME, ARENA_TEAM_SIZE } from '../../utils/constants.js';
 
@@ -17,9 +17,9 @@ export async function handleClaimNewbieGift(e, pluginInstance) {
         return e.reply(`【${playerData.nickname}】您已经领取过新手礼包了，每位调查员限领一次哦。`);
     }
 
-    // 奖励
     const giftFunds = 20000;
     playerData.funds += giftFunds;
+    playerData.seedsOfLight = (playerData.seedsOfLight || 0) + 10; // 新手礼包赠送10光之种
 
     const allWeapons = getWeapons();
     const purchasableWeapons = allWeapons.filter(w => w.price > 0 && w.name !== INITIAL_WEAPON_NAME);
@@ -40,8 +40,9 @@ export async function handleClaimNewbieGift(e, pluginInstance) {
 
     let replyMsg = `🎉 新手礼包已查收！🎉\n`;
     replyMsg += `【${playerData.nickname}】恭喜您获得 ${giftFunds} 启动资金！\n`;
+    replyMsg += `同时获得 10 光之种，用于强化您的佣兵！\n`;
     replyMsg += `${giftedWeaponMsg}\n`;
-    replyMsg += `当前总资金: ${playerData.funds}。祝您在都市的探索一帆风顺！`;
+    replyMsg += `当前总资金: ${playerData.funds}。当前光之种: ${playerData.seedsOfLight}。\n祝您在都市的探索一帆风顺！`;
 
     return e.reply(replyMsg);
 }
@@ -66,6 +67,7 @@ export async function handleViewMyInfo(e, pluginInstance) {
         infoMsg += `--- 调查员 ${displayedNickname} 的个人档案 ---\n`;
     }
     infoMsg += `资金: ${playerData.funds}\n`;
+    infoMsg += `光之种: ${playerData.seedsOfLight || 0} (用于佣兵进阶)\n`; // 显示光之种
 
     if (playerData.needsTreatment && playerData.permanentInjuryStatus && playerData.permanentInjuryStatus !== 'none') {
         const injuryName = INJURY_LEVELS[playerData.permanentInjuryStatus]?.name || playerData.permanentInjuryStatus;
@@ -104,7 +106,6 @@ export async function handleViewMyInfo(e, pluginInstance) {
         infoMsg += `  暂无特殊收藏品\n`;
     }
 
-    // 新增：显示佣兵和竞技场队伍信息
     infoMsg += `\n佣兵数量: ${playerData.mercenaries ? playerData.mercenaries.length : 0} (使用 #佣兵列表 查看详情)\n`;
     if (playerData.arenaTeam && playerData.arenaTeam.length > 0) {
         const allMercDefs = getMercenaries();
@@ -118,8 +119,9 @@ export async function handleViewMyInfo(e, pluginInstance) {
     }
 
 
-    if (infoMsg.length > MAX_MESSAGE_LENGTH && global.Bot && global.Bot.makeForwardMsg) {
+    if (infoMsg.length > MAX_MESSAGE_LENGTH * 2 && global.Bot && global.Bot.makeForwardMsg) {
         try {
+            // For personal info, usually better as one block, so pass as single string in array.
             const forwardMsg = await makeForwardMsgWithContent([infoMsg.trim()], "个人档案");
             if (forwardMsg) {
                 await e.reply(forwardMsg);
@@ -138,7 +140,7 @@ export async function handleViewMyInfo(e, pluginInstance) {
 
 export async function handleShowHelp(e, pluginInstance) {
     let helpMsg = "--- 都市迷踪与佣兵竞技行动手册 ---\n\n";
-    helpMsg += "  #新手礼包 - (限领一次)获得启动资金和随机装备。\n";
+    helpMsg += "  #新手礼包 - (限领一次)获得启动资金、随机装备和少量光之种。\n";
     helpMsg += "【冒险准备 (搜打撤)】\n";
     helpMsg += "  #装备 武器名 - 设置默认地图武器。\n";
     helpMsg += `  #策略 策略名 - 设置默认地图策略。可选：${VALID_STRATEGIES.join('、 ')}。\n`;
@@ -151,7 +153,7 @@ export async function handleShowHelp(e, pluginInstance) {
     helpMsg += "  #查看队列 - 查看所有地图的待命人数。\n\n";
 
     helpMsg += "【角色信息 & 装备 (搜打撤)】\n";
-    helpMsg += "  #我的信息 - 查看个人资金、装备、收藏品、佣兵概况等。\n";
+    helpMsg += "  #我的信息 - 查看个人资金、光之种、装备、收藏品、佣兵概况等。\n";
     helpMsg += "  #武器列表 - 显示所有已记录的装备型号。\n";
     helpMsg += "  #查看商店 - 访问“黑市”交易装备与身份标识。\n";
     helpMsg += "  #购买武器 武器名称 - 从“黑市”采购装备。\n";
@@ -169,10 +171,14 @@ export async function handleShowHelp(e, pluginInstance) {
     helpMsg += "  #查看当前活动 - 获取最新活动信息。\n\n";
 
     helpMsg += "--- 佣兵与竞技场系统 ---\n\n";
-    helpMsg += "【佣兵招募】\n";
-    helpMsg += "  #随机招募 - 花费500资金招募一名随机佣兵。\n";
-    helpMsg += "  #随机十连 - 花费4500资金进行十次招募。\n";
-    helpMsg += "  #佣兵列表 - 查看您拥有的所有佣兵及其详情。\n\n";
+    helpMsg += "【佣兵招募与培养】\n";
+    helpMsg += "  #随机招募 - 花费资金招募一名随机佣兵。\n";
+    helpMsg += "  #随机十连 - 花费资金进行十次招募 (保底三星以上)。\n";
+    helpMsg += "  #每日十连 - 每日免费进行一次十连招募 (保底三星以上)。\n";
+    helpMsg += "  #佣兵列表 - 查看您拥有的所有佣兵及其摘要(含光之种数量)。\n";
+    helpMsg += "  #查看佣兵 [序号/名称] - 查看指定佣兵详细信息、图片及进阶消耗。\n";
+    helpMsg += "  #进阶 [序号/名称] - 消耗光之种提升指定佣兵的进阶等级。\n\n";
+
 
     helpMsg += "【竞技场】\n";
     helpMsg += `  #佣兵配队 序号1,序号2,...,序号${ARENA_TEAM_SIZE} - 配置竞技场队伍 (使用 #佣兵列表 中的序号)。\n`;
@@ -186,11 +192,13 @@ export async function handleShowHelp(e, pluginInstance) {
 
     if (global.Bot && global.Bot.makeForwardMsg) {
         try {
+            // For help, it's better to send it as one coherent block of text.
+            // Pass as a single string in an array.
             const forwardMsg = await makeForwardMsgWithContent([helpMsg.trim()], "都市迷踪行动手册");
             if (forwardMsg) {
                 await e.reply(forwardMsg);
             } else {
-                e.reply(helpMsg);
+                e.reply(helpMsg); // Fallback
             }
         } catch (err) {
             logger.error('[InfoHandler] 创建帮助手册转发失败:', err);
@@ -202,17 +210,15 @@ export async function handleShowHelp(e, pluginInstance) {
     return true;
 }
 
-// handleListMaps, handleListWeapons, handleShowLeaderboard, handleSetDefaultWeapon, handleSetDefaultStrategy, handleToggleAutoHeal 函数保持不变
-// ... (这些函数的代码与你之前提供的版本一致，此处省略以减少篇幅)
 
 export async function handleListMaps(e, pluginInstance) {
     const maps = getMaps();
     if (!maps || maps.length === 0) {
         return e.reply("当前“都市档案库”中没有可用的区域情报。");
     }
-    let mapListMsg = "--- 已知异常区域列表 (可使用 #进入地图 区域编号 进入) ---\n";
+    let mapListText = "--- 已知异常区域列表 (可使用 #进入地图 区域编号 进入) ---\n";
     maps.forEach((map, index) => {
-        mapListMsg += `\n${index + 1}. 区域名称: ${map.name}\n` +
+        mapListText += `\n${index + 1}. 区域名称: ${map.name}\n` +
             `  “信息费”: ${map.entryFee} 资金\n` +
             `  建议威胁评估: ${map.limitCombatPower}\n` +
             `  调查小队上限: ${map.playerCapacity}人\n` +
@@ -223,18 +229,18 @@ export async function handleListMaps(e, pluginInstance) {
 
     if (global.Bot && global.Bot.makeForwardMsg) {
         try {
-            const forwardMsg = await makeForwardMsgWithContent([mapListMsg.trim()], "都市区域档案");
+            const forwardMsg = await makeForwardMsgWithContent([mapListText.trim()], "都市区域档案");
             if (forwardMsg) {
                 await e.reply(forwardMsg);
             } else {
-                e.reply(mapListMsg.substring(0, MAX_MESSAGE_LENGTH * 2) + "\n...(区域情报过长，部分信息未能完整显示)");
+                e.reply(mapListText.substring(0, MAX_MESSAGE_LENGTH * 2) + "\n...(区域情报过长，部分信息未能完整显示)");
             }
         } catch (err) {
             logger.error('[InfoHandler] 创建区域情报转发失败:', err);
-            e.reply(mapListMsg.substring(0, MAX_MESSAGE_LENGTH * 2) + "\n...(情报过载，部分截断)");
+            e.reply(mapListText.substring(0, MAX_MESSAGE_LENGTH * 2) + "\n...(情报过载，部分截断)");
         }
     } else {
-        e.reply(mapListMsg);
+        e.reply(mapListText);
     }
     return true;
 }
@@ -244,9 +250,9 @@ export async function handleListWeapons(e, pluginInstance) {
     if (!weapons || weapons.length === 0) {
         return e.reply("当前“装备数据库”中没有信息。");
     }
-    let weaponListMsg = "--- 装备数据库 ---\n";
+    let weaponListText = "--- 装备数据库 ---\n";
     weapons.forEach(w => {
-        weaponListMsg += `\n型号: ${w.name}\n` +
+        weaponListText += `\n型号: ${w.name}\n` +
             `  稀有度: ${w.rarity || '标准'}\n` +
             `  基础威胁评估: ${w.baseCombatPower}\n` +
             `  特性: ${w.passive || '无'} (类型: ${w.passiveType || 'none'})\n` +
@@ -256,18 +262,18 @@ export async function handleListWeapons(e, pluginInstance) {
 
     if (global.Bot && global.Bot.makeForwardMsg) {
         try {
-            const forwardMsg = await makeForwardMsgWithContent([weaponListMsg.trim()], "装备数据库");
+            const forwardMsg = await makeForwardMsgWithContent([weaponListText.trim()], "装备数据库");
             if (forwardMsg) {
                 await e.reply(forwardMsg);
             } else {
-                e.reply(weaponListMsg.substring(0, MAX_MESSAGE_LENGTH * 2) + "\n...(装备数据过长，部分信息未能完整显示)");
+                e.reply(weaponListText.substring(0, MAX_MESSAGE_LENGTH * 2) + "\n...(装备数据过长，部分信息未能完整显示)");
             }
         } catch (err) {
             logger.error('[InfoHandler] 创建装备数据库转发失败:', err);
-            e.reply(weaponListMsg.substring(0, MAX_MESSAGE_LENGTH * 2) + "\n...(数据过载，部分截断)");
+            e.reply(weaponListText.substring(0, MAX_MESSAGE_LENGTH * 2) + "\n...(数据过载，部分截断)");
         }
     } else {
-        e.reply(weaponListMsg);
+        e.reply(weaponListText);
     }
     return true;
 }
@@ -302,34 +308,38 @@ export async function handleShowLeaderboard(e, pluginInstance) {
             userId: player.userId,
             funds: player.funds || 0,
             bestWeaponDisplay: bestWeaponName,
+            seedsOfLight: player.seedsOfLight || 0 // 添加光之种到排行榜数据
         };
-    }).sort((a, b) => b.funds - a.funds)
+    }).sort((a, b) => b.funds - a.funds) // 主排序：资金
         .slice(0, 10);
+
+    // 可以考虑添加一个光之种排行榜，或者在财富榜上附带显示光之种数量
+    // 这里我们仅在财富榜条目中加入光之种信息
 
     if (leaderboard.length === 0) {
         return e.reply("“都市财富榜”暂无有效数据。");
     }
 
-    let leaderboardMsg = "--- 都市财富榜 Top 10 ---\n";
+    let leaderboardText = "--- 都市财富榜 Top 10 ---\n";
     leaderboard.forEach((player, index) => {
-        leaderboardMsg += `\n${index + 1}. ${player.nickname} (编号: ...${String(player.userId).slice(-4)})\n` +
-            `   资金: ${player.funds}\n` +
-            `   最强装备(搜打撤): ${player.bestWeaponDisplay}\n`; // 稍作修改以区分
+        leaderboardText += `\n${index + 1}. ${player.nickname} (编号: ...${String(player.userId).slice(-4)})\n` +
+            `   资金: ${player.funds} | 光之种: ${player.seedsOfLight}\n` + // 显示光之种
+            `   最强装备(搜打撤): ${player.bestWeaponDisplay}\n`;
     });
     if (global.Bot && global.Bot.makeForwardMsg) {
         try {
-            const forwardMsg = await makeForwardMsgWithContent([leaderboardMsg.trim()], "都市财富榜");
+            const forwardMsg = await makeForwardMsgWithContent([leaderboardText.trim()], "都市财富榜");
             if (forwardMsg) {
                 await e.reply(forwardMsg);
             } else {
-                e.reply(leaderboardMsg.substring(0, MAX_MESSAGE_LENGTH * 2) + "\n...(排行榜数据过长，部分信息未能完整显示)");
+                e.reply(leaderboardText.substring(0, MAX_MESSAGE_LENGTH * 2) + "\n...(排行榜数据过长，部分信息未能完整显示)");
             }
         } catch (err) {
             logger.error('[InfoHandler] 创建财富榜转发失败:', err);
-            e.reply(leaderboardMsg.substring(0, MAX_MESSAGE_LENGTH * 2) + "\n...(数据过载，部分截断)");
+            e.reply(leaderboardText.substring(0, MAX_MESSAGE_LENGTH * 2) + "\n...(数据过载，部分截断)");
         }
     } else {
-        e.reply(leaderboardMsg);
+        e.reply(leaderboardText);
     }
     return true;
 }
@@ -366,6 +376,9 @@ export async function handleSetDefaultStrategy(e, pluginInstance) {
     const { playerData } = await pluginInstance.getPlayer(userId, e.sender.card || e.sender.nickname);
 
     if (!playerData) return e.reply("身份验证失败，无法设置默认策略。");
+    if (!VALID_STRATEGIES.includes(strategyName)) {
+        return e.reply(`未知的策略: "${strategyName}". 可选策略: ${VALID_STRATEGIES.join(', ')}.`);
+    }
 
     playerData.defaultStrategy = strategyName;
     await savePlayerData(userId, playerData);
