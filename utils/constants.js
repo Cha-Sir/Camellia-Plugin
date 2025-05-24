@@ -38,8 +38,45 @@ export const QUEUE_CHECK_INTERVAL = 60 * 1000; // 单位是毫秒，这里代表
 export const DEFAULT_NPC_FILL_DELAY_MINUTES = 5;
 
 export const INJURY_LEVELS = {
-    light: { name: '轻伤', cost: 50 },
-    medium: { name: '一般伤', cost: 150 },
-    heavy: { name: '重伤', cost: 300 },
+    light: { name: '轻伤', cost: 15 },
+    medium: { name: '一般伤', cost: 50 },
+    heavy: { name: '重伤', cost: 100 },
     none: { name: '无伤', cost: 0 }
 };
+
+// --- 新增佣兵与竞技场常量 ---
+
+// 佣兵招募费用
+export const MERCENARY_RECRUIT_COST = 200; // 单次招募费用
+export const MERCENARY_RECRUIT_TEN_COST = 1900; // 十连招募费用 (可选，如果打折)
+
+// 佣兵最大进阶等级
+export const MERCENARY_MAX_EVOLUTION_LEVEL = 5;
+
+// 佣兵满级后重复获得奖励
+export const MERCENARY_MAX_LEVEL_DUPLICATE_REWARD = 1000; // 金币
+
+// 佣兵招募概率 (星级: 概率) - 总和应为 1
+export const MERCENARY_RARITY_PROBABILITY = {
+    1: 0.20, // 60%
+    2: 0.45, // 25%
+    3: 0.30, // 10%
+    4: 0.04, // 4%
+    5: 0.01  // 1%
+};
+
+// 竞技场队伍最大佣兵数量
+export const ARENA_TEAM_SIZE = 5;
+
+// 竞技场胜利奖励范围
+export const ARENA_WIN_REWARD_MIN = 10;
+export const ARENA_WIN_REWARD_MAX = 2000;
+
+// 竞技场第三方AI API端点
+export const ARENA_AI_API_ENDPOINT = "api2.aigcbest.top/v1/chat/completions"; // 请替换为实际的OpenAI兼容API端点
+export const ARENA_AI_MODEL_NAME = "gemini-2.5-pro-preview-03-25"; // 或你使用的模型
+
+export const ARENA_BATTLE_MIN_TURNS = 3;
+export const ARENA_BATTLE_MAX_TURNS = 5;
+
+export const TEN_PULL_GUARANTEE_MIN_RARITY = 3;

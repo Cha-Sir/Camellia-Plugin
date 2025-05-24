@@ -151,7 +151,7 @@
   {
     "name": "求生者工具包",
     "price": 13000,
-    "baseCombatPower": 130,
+    "baseCombatPower": 30,
     "passive": "顽强意志",
     "passiveType": "post_combat_ignore_wound",
     "passiveDescription": "即使战斗失利，也有极大可能仅受轻伤或避免进入“负伤”状态，从而保留物资。",

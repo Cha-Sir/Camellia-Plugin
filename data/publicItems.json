@@ -28,9 +28,9 @@
     "description": "包含多种常用工具的组合包，应对突发状况的利器。"
   },
   {
-    "name": "“幽影”干扰器 (原型)",
+    "name": "“幽影”干扰器",
     "price": 0,
-    "baseCombatPower": 0,
+    "baseCombatPower": 10,
     "passive": "短暂隐匿",
     "passiveType": "evasion_boost_post_combat",
     "passiveValue": 0.20,
@@ -40,9 +40,9 @@
     "description": "一个实验性的干扰装置，能在短时间内扭曲使用者的光学信号，辅助撤退。"
   },
   {
-    "name": "“洞察”辅助目镜 (损坏)",
+    "name": "“洞察”辅助目镜",
     "price": 20000,
-    "rarity": "罕见",
+    "rarity": "收藏品",
     "type": "collectible",
     "description": "一个损坏的战术目镜，核心功能缺失，但其精密结构仍有收藏价值。"
   }

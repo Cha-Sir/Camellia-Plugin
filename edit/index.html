@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>佣兵数据编辑器</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+  <h1>佣兵数据编辑器</h1>
+
+  <div class="file-operations">
+    <label for="fileLoader">加载 mercenaries.json:</label>
+    <input type="file" id="fileLoader" accept=".json">
+    <button id="downloadJson">下载修改后的 JSON</button>
+    <button id="clearEditor">清空编辑器</button>
+  </div>
+
+  <hr>
+
+  <div class="editor-section">
+    <h2>当前佣兵列表</h2>
+    <div id="mercenaryList" class="mercenary-list">
+      <!-- 佣兵条目将在这里动态生成 -->
+    </div>
+    <button id="showAddMercenaryForm" class="add-button">+ 添加新佣兵</button>
+  </div>
+
+  <hr>
+
+  <div id="mercenaryFormContainer" class="form-container" style="display:none;">
+    <h2 id="formTitle">添加新佣兵</h2>
+    <form id="mercenaryForm">
+      <input type="hidden" id="mercId" name="id"> <!-- 用于编辑时存储ID -->
+      <input type="hidden" id="mercArrayIndex" name="arrayIndex"> <!-- 用于编辑时存储在数组中的索引 -->
+
+      <div class="form-group">
+        <label for="name">名称:</label>
+        <input type="text" id="name" name="name" required>
+      </div>
+      <div class="form-group">
+        <label for="rarity">稀有度 (1-5):</label>
+        <input type="number" id="rarity" name="rarity" min="1" max="5" value="1" required>
+      </div>
+      <div class="form-group">
+        <label for="imageUrl">图片文件名 (例如: kaiser.png):</label>
+        <input type="text" id="imageUrl" name="imageUrl" placeholder="alex.png">
+        <small>图片应放置在插件的 `data/mercenary_images/` 目录下</small>
+      </div>
+      <div class="form-group">
+        <label for="description">简介:</label>
+        <textarea id="description" name="description" rows="3"></textarea>
+      </div>
+
+      <h3>技能 (最多5个，按进阶等级顺序)</h3>
+      <div id="skillsContainer">
+        <!-- 技能输入将在这里动态生成 -->
+      </div>
+      <button type="button" id="addSkillButton">添加技能</button>
+
+      <div class="form-actions">
+        <button type="submit" id="saveMercenaryButton">保存佣兵</button>
+        <button type="button" id="cancelEditButton" style="display:none;">取消编辑</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

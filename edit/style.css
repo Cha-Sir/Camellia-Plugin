@@ -1,0 +1,178 @@
+body {
+    font-family: sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f4f4;
+    color: #333;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+h1, h2, h3 {
+    color: #333;
+}
+
+hr {
+    margin: 20px 0;
+    border: 0;
+    border-top: 1px solid #eee;
+}
+
+.file-operations, .form-actions {
+    margin-bottom: 20px;
+}
+
+.file-operations label {
+    margin-right: 10px;
+}
+
+button {
+    background-color: #5cb85c;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 5px;
+}
+
+button:hover {
+    background-color: #4cae4c;
+}
+
+#downloadJson {
+    background-color: #007bff;
+}
+#downloadJson:hover {
+    background-color: #0056b3;
+}
+
+#clearEditor, #cancelEditButton {
+    background-color: #f0ad4e;
+}
+#clearEditor:hover, #cancelEditButton:hover {
+    background-color: #ec971f;
+}
+
+.add-button {
+    background-color: #337ab7;
+    margin-top: 10px;
+}
+.add-button:hover {
+    background-color: #286090;
+}
+
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group textarea {
+    width: calc(100% - 22px); /* Account for padding and border */
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.form-group small {
+    font-size: 0.8em;
+    color: #777;
+}
+
+.mercenary-list {
+    margin-top: 10px;
+}
+
+.mercenary-item {
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.mercenary-item-details {
+    flex-grow: 1;
+}
+.mercenary-item-details h4 {
+    margin-top: 0;
+    margin-bottom: 5px;
+}
+.mercenary-item-details p {
+    margin: 2px 0;
+    font-size: 0.9em;
+}
+.mercenary-item-details .skills-list {
+    list-style-type: disc;
+    margin-left: 20px;
+    padding-left: 0;
+}
+
+
+.mercenary-item-actions button {
+    padding: 5px 10px;
+    font-size: 0.9em;
+    margin-left: 5px;
+}
+
+.mercenary-item-actions .edit-btn {
+    background-color: #5bc0de;
+}
+.mercenary-item-actions .edit-btn:hover {
+    background-color: #31b0d5;
+}
+.mercenary-item-actions .delete-btn {
+    background-color: #d9534f;
+}
+.mercenary-item-actions .delete-btn:hover {
+    background-color: #c9302c;
+}
+
+
+.skill-entry {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px dashed #ccc;
+    border-radius: 4px;
+}
+.skill-entry label {
+    margin-right: 5px;
+    white-space: nowrap;
+}
+.skill-entry input[type="number"] {
+    width: 60px;
+    margin-right: 10px;
+}
+.skill-entry input[type="text"] {
+    flex-grow: 1;
+    margin-right: 10px;
+}
+.skill-entry button {
+    background-color: #d9534f;
+    padding: 5px 8px;
+    font-size: 0.8em;
+}

@@ -1,7 +1,7 @@
 // camellia-plugin/utils/dataManager.js
 import fs from 'fs-extra';
 import path from 'path';
-import { INITIAL_WEAPON_NAME } from './constants.js';
+import { INITIAL_WEAPON_NAME, VALID_STRATEGIES } from './constants.js';
 
 const _path = process.cwd();
 const pluginRootPath = path.join(_path, 'plugins', 'camellia-plugin');
@@ -30,6 +30,7 @@ const PUBLIC_ITEM_FILE = path.join(pluginDataDir, 'publicItems.json');
 const TITLE_FILE = path.join(pluginDataDir, 'titles.json');
 const ACTIVITY_TEXT_FILE = path.join(pluginDataDir, 'currentActivity.txt');
 const NPC_FILE = path.join(pluginDataDir, 'npcs.json');
+const MERCENARY_FILE = path.join(pluginDataDir, 'mercenaries.json');
 
 let itemsData = [];
 let weaponsData = [];
@@ -38,6 +39,7 @@ let publicItemsData = [];
 let titlesData = [];
 let currentActivityText = "";
 let npcsData = [];
+let mercenariesData = [];
 
 /**
  * 加载所有基础游戏数据.
@@ -51,6 +53,7 @@ async function loadAllBaseData() {
         publicItemsData = await fs.readJson(PUBLIC_ITEM_FILE, { throws: false }) || [];
         titlesData = await fs.readJson(TITLE_FILE, { throws: false }) || [];
         npcsData = await fs.readJson(NPC_FILE, { throws: false }) || [];
+        mercenariesData = await fs.readJson(MERCENARY_FILE, { throws: false }) || [];
 
         if (await fs.pathExists(ACTIVITY_TEXT_FILE)) {
             currentActivityText = await fs.readFile(ACTIVITY_TEXT_FILE, 'utf-8');
@@ -68,6 +71,8 @@ async function loadAllBaseData() {
         if (publicItemsData.length === 0) currentLogger.info('[AdventureGame/DataManager] 提示: publicItems.json 为空或加载失败。');
         if (titlesData.length === 0) currentLogger.info('[AdventureGame/DataManager] 提示: titles.json 为空或加载失败。');
         if (npcsData.length === 0) currentLogger.warn('[AdventureGame/DataManager] 警告: npcs.json 为空或加载失败 (NPC系统可能无法正常运作)。');
+        if (mercenariesData.length === 0) currentLogger.warn('[AdventureGame/DataManager] 警告: mercenaries.json 为空或加载失败 (佣兵系统可能无法正常运作)。');
+
 
         let initialWeapon = weaponsData.find(w => w.name === INITIAL_WEAPON_NAME);
         if (!initialWeapon) {
@@ -106,6 +111,10 @@ function getPublicItems() { return publicItemsData; }
 function getTitles() { return titlesData; }
 function getCurrentActivityText() { return currentActivityText; }
 function getNpcs() { return npcsData; }
+function getMercenaries() { return mercenariesData; }
+
+export const mercenaryImagePath = path.join(pluginDataDir, 'mercenary_images');
+
 
 async function getPlayerData(userId, nickname = '') {
     const playerFile = path.join(playersDir, `${userId}.json`);
@@ -130,11 +139,17 @@ async function getPlayerData(userId, nickname = '') {
             collectibles: [],
             purchasedTitles: [],
             activeTitle: "",
-            // 新增伤病状态字段
-            permanentInjuryStatus: 'none', // 'none', 'light', 'medium', 'heavy' (对应中文：无伤，轻伤，一般伤，重伤)
-            needsTreatment: false
+            permanentInjuryStatus: 'none',
+            needsTreatment: false,
+            defaultWeapon: "",
+            defaultStrategy: "",
+            autoHealEnabled: false,
+            mercenaries: [],
+            arenaTeam: [],
+            hasClaimedNewbieGift: false,
+            lastFreeTenPullDate: "" // 新增：记录上次免费十连的日期 (YYYY-MM-DD)
         };
-        if (weaponsData.length === 0) await loadAllBaseData();
+        if (weaponsData.length === 0) await loadAllBaseData(); // Ensure base data is loaded for INITIAL_WEAPON_NAME
 
         const saveSuccess = await savePlayerData(userId, finalPlayerData);
         if (saveSuccess) {
@@ -144,6 +159,7 @@ async function getPlayerData(userId, nickname = '') {
         }
     } else {
         finalPlayerData = loadedPlayerData;
+        // 确保老玩家数据也包含所有字段
         if (!finalPlayerData.heldWeapons) finalPlayerData.heldWeapons = [];
         if (!finalPlayerData.heldWeapons.includes(INITIAL_WEAPON_NAME)) {
             finalPlayerData.heldWeapons.push(INITIAL_WEAPON_NAME);
@@ -152,9 +168,15 @@ async function getPlayerData(userId, nickname = '') {
         if (!finalPlayerData.collectibles) finalPlayerData.collectibles = [];
         if (!finalPlayerData.purchasedTitles) finalPlayerData.purchasedTitles = [];
         if (typeof finalPlayerData.activeTitle === 'undefined') finalPlayerData.activeTitle = "";
-        // 初始化新字段（如果老玩家数据中没有）
         if (typeof finalPlayerData.permanentInjuryStatus === 'undefined') finalPlayerData.permanentInjuryStatus = 'none';
         if (typeof finalPlayerData.needsTreatment === 'undefined') finalPlayerData.needsTreatment = false;
+        if (typeof finalPlayerData.defaultWeapon === 'undefined') finalPlayerData.defaultWeapon = "";
+        if (typeof finalPlayerData.defaultStrategy === 'undefined') finalPlayerData.defaultStrategy = "";
+        if (typeof finalPlayerData.autoHealEnabled === 'undefined') finalPlayerData.autoHealEnabled = false;
+        if (!finalPlayerData.mercenaries) finalPlayerData.mercenaries = [];
+        if (!finalPlayerData.arenaTeam) finalPlayerData.arenaTeam = [];
+        if (typeof finalPlayerData.hasClaimedNewbieGift === 'undefined') finalPlayerData.hasClaimedNewbieGift = false;
+        if (typeof finalPlayerData.lastFreeTenPullDate === 'undefined') finalPlayerData.lastFreeTenPullDate = ""; // 新增字段初始化
 
 
         if (nickname && finalPlayerData.nickname !== nickname) {
@@ -215,8 +237,9 @@ export {
     getTitles,
     getCurrentActivityText,
     getNpcs,
+    getMercenaries,
     getPlayerData,
     savePlayerData,
     getAllPlayerData,
-    pluginDataDir
+    pluginDataDir,
 };
