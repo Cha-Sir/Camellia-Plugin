@@ -1,8 +1,6 @@
-// camellia-plugin/apps/handlers/infoHandler.js
-
 import { getPlayerData, savePlayerData, getMaps, getWeapons, getAllPlayerData, getTitles, getMercenaries } from '../../utils/dataManager.js';
 import { makeForwardMsgWithContent } from '../../utils/messageHelper.js';
-import { MAX_MESSAGE_LENGTH, VALID_STRATEGIES, INJURY_LEVELS, INITIAL_WEAPON_NAME, ARENA_TEAM_SIZE } from '../../utils/constants.js';
+import { MAX_MESSAGE_LENGTH, VALID_STRATEGIES, INJURY_LEVELS, INITIAL_WEAPON_NAME, ARENA_TEAM_SIZE, AI_ARENA_COOLDOWN_MINUTES } from '../../utils/constants.js';
 
 export async function handleClaimNewbieGift(e, pluginInstance) {
     const userId = e.user_id;
@@ -19,7 +17,7 @@ export async function handleClaimNewbieGift(e, pluginInstance) {
 
     const giftFunds = 20000;
     playerData.funds += giftFunds;
-    playerData.seedsOfLight = (playerData.seedsOfLight || 0) + 10; // 新手礼包赠送10光之种
+    playerData.seedsOfLight = (playerData.seedsOfLight || 0) + 10;
 
     const allWeapons = getWeapons();
     const purchasableWeapons = allWeapons.filter(w => w.price > 0 && w.name !== INITIAL_WEAPON_NAME);
@@ -67,7 +65,7 @@ export async function handleViewMyInfo(e, pluginInstance) {
         infoMsg += `--- 调查员 ${displayedNickname} 的个人档案 ---\n`;
     }
     infoMsg += `资金: ${playerData.funds}\n`;
-    infoMsg += `光之种: ${playerData.seedsOfLight || 0} (用于佣兵进阶)\n`; // 显示光之种
+    infoMsg += `光之种: ${playerData.seedsOfLight || 0} (用于佣兵进阶)\n`;
 
     if (playerData.needsTreatment && playerData.permanentInjuryStatus && playerData.permanentInjuryStatus !== 'none') {
         const injuryName = INJURY_LEVELS[playerData.permanentInjuryStatus]?.name || playerData.permanentInjuryStatus;
@@ -117,11 +115,19 @@ export async function handleViewMyInfo(e, pluginInstance) {
     } else {
         infoMsg += `竞技场队伍: 未配置\n`;
     }
+    // 显示AI竞技场冷却
+    const now = Date.now();
+    const cooldownMillis = AI_ARENA_COOLDOWN_MINUTES * 60 * 1000;
+    if (playerData.lastAiArenaEntryTime && (now - playerData.lastAiArenaEntryTime < cooldownMillis)) {
+        const timeLeft = Math.ceil((cooldownMillis - (now - playerData.lastAiArenaEntryTime)) / 60000);
+        infoMsg += `AI竞技场冷却中，剩余 ${timeLeft} 分钟。\n`;
+    } else {
+        infoMsg += `AI竞技场可挑战。\n`;
+    }
 
 
     if (infoMsg.length > MAX_MESSAGE_LENGTH * 2 && global.Bot && global.Bot.makeForwardMsg) {
         try {
-            // For personal info, usually better as one block, so pass as single string in array.
             const forwardMsg = await makeForwardMsgWithContent([infoMsg.trim()], "个人档案");
             if (forwardMsg) {
                 await e.reply(forwardMsg);
@@ -175,8 +181,11 @@ export async function handleShowHelp(e, pluginInstance) {
     helpMsg += "  #随机招募 - 花费资金招募一名随机佣兵。\n";
     helpMsg += "  #随机十连 - 花费资金进行十次招募 (保底三星以上)。\n";
     helpMsg += "  #每日十连 - 每日免费进行一次十连招募 (保底三星以上)。\n";
-    helpMsg += "  #佣兵列表 - 查看您拥有的所有佣兵及其摘要(含光之种数量)。\n";
-    helpMsg += "  #查看佣兵 [序号/名称] - 查看指定佣兵详细信息、图片及进阶消耗。\n";
+    helpMsg += "  #UP招募 - (活动)在特定UP池中招募一名佣兵。\n";
+    helpMsg += "  #UP十连 - (活动)在特定UP池中进行十次招募。\n";
+    helpMsg += "  #查看卡池 - 查看当前所有可招募佣兵及UP池信息。\n";
+    helpMsg += "  #佣兵列表 - (仅限私聊使用）查看您拥有的所有佣兵及其摘要(含光之种数量)。\n";
+    helpMsg += "  #查看佣兵 [序号/名称] - （不带序号则可查看所有拥有佣兵）查看指定佣兵详细信息、图片及进阶消耗。\n";
     helpMsg += "  #进阶 [序号/名称] - 消耗光之种提升指定佣兵的进阶等级。\n\n";
     helpMsg += "  #光之种商店 - 消耗光之种购买佣兵。\n\n";
 
@@ -184,7 +193,9 @@ export async function handleShowHelp(e, pluginInstance) {
     helpMsg += "【竞技场】\n";
     helpMsg += `  #佣兵配队 序号1,序号2,...,序号${ARENA_TEAM_SIZE} - 配置竞技场队伍 (使用 #佣兵列表 中的序号)。\n`;
     helpMsg += "  #加入竞技场 - 加入匹配队列，等待与其他玩家对战。\n";
-    helpMsg += "  #退出竞技场队列 - 离开竞技场匹配队列。\n\n";
+    helpMsg += "  #退出竞技场队列 - 离开竞技场匹配队列。\n";
+    helpMsg += `  #AI竞技场 - 与随机配置的AI队伍进行对战 (每${AI_ARENA_COOLDOWN_MINUTES}分钟一次)。\n\n`;
+
 
     helpMsg += "【帮助 & 管理】\n";
     helpMsg += "  #搜打撤帮助 - 显示此行动手册。\n";
@@ -193,13 +204,11 @@ export async function handleShowHelp(e, pluginInstance) {
 
     if (global.Bot && global.Bot.makeForwardMsg) {
         try {
-            // For help, it's better to send it as one coherent block of text.
-            // Pass as a single string in an array.
             const forwardMsg = await makeForwardMsgWithContent([helpMsg.trim()], "卡莫利安行动手册");
             if (forwardMsg) {
                 await e.reply(forwardMsg);
             } else {
-                e.reply(helpMsg); // Fallback
+                e.reply(helpMsg);
             }
         } catch (err) {
             logger.error('[InfoHandler] 创建帮助手册转发失败:', err);
@@ -309,13 +318,11 @@ export async function handleShowLeaderboard(e, pluginInstance) {
             userId: player.userId,
             funds: player.funds || 0,
             bestWeaponDisplay: bestWeaponName,
-            seedsOfLight: player.seedsOfLight || 0 // 添加光之种到排行榜数据
+            seedsOfLight: player.seedsOfLight || 0
         };
-    }).sort((a, b) => b.funds - a.funds) // 主排序：资金
+    }).sort((a, b) => b.funds - a.funds)
         .slice(0, 10);
 
-    // 可以考虑添加一个光之种排行榜，或者在财富榜上附带显示光之种数量
-    // 这里我们仅在财富榜条目中加入光之种信息
 
     if (leaderboard.length === 0) {
         return e.reply("“都市财富榜”暂无有效数据。");
@@ -324,7 +331,7 @@ export async function handleShowLeaderboard(e, pluginInstance) {
     let leaderboardText = "--- 都市财富榜 Top 10 ---\n";
     leaderboard.forEach((player, index) => {
         leaderboardText += `\n${index + 1}. ${player.nickname} (编号: ...${String(player.userId).slice(-4)})\n` +
-            `   资金: ${player.funds} | 光之种: ${player.seedsOfLight}\n` + // 显示光之种
+            `   资金: ${player.funds} | 光之种: ${player.seedsOfLight}\n` +
             `   最强装备(搜打撤): ${player.bestWeaponDisplay}\n`;
     });
     if (global.Bot && global.Bot.makeForwardMsg) {

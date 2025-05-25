@@ -1,35 +1,35 @@
 [
   {
     "name": "应急口粮棒",
-    "price": 10,
+    "price": 50,
     "rarity": "普通",
     "type": "item",
     "description": "维持基本生理需求的压缩食品，味道和包装一样乏善可陈。"
   },
   {
     "name": "损坏的义体零件",
-    "price": 15,
+    "price": 45,
     "rarity": "普通",
     "type": "item",
     "description": "来源不明的义体部件，布满划痕，似乎经历过激烈的冲突。"
   },
   {
     "name": "“安定”注射剂",
-    "price": 30,
+    "price": 50,
     "rarity": "普通",
     "type": "item",
     "description": "短效精神稳定剂，能暂时压制恐慌，但有轻微的认知模糊副作用。"
   },
   {
     "name": "加密数据盘",
-    "price": 140,
+    "price": 240,
     "rarity": "稀有",
     "type": "item",
     "description": "一块无法直接读取的数据盘，表面覆盖着复杂的加密纹路。"
   },
   {
     "name": "“呢喃”石块",
-    "price": 180,
+    "price": 280,
     "rarity": "稀有",
     "type": "item",
     "description": "握在手中时能听到微弱、无法理解的低语，来源不明。"
@@ -131,5 +131,19 @@
     "rarity": "收藏品",
     "type": "collectible",
     "description": "来自被摧毁的哨兵7号，核心部件已损坏，但仍有研究价值。"
+  },
+  {
+    "name": "耗子内脏",
+    "price": 55,
+    "rarity": "稀有",
+    "type": "item",
+    "description": "从无名收尾人耗子身上获取的生物组织，用途不明，但散发着异味。"
+  },
+  {
+    "name": "后巷通行证",
+    "price": 40000,
+    "rarity": "收藏品",
+    "type": "collectible",
+    "description": "一张破旧的卡片，似乎是某个隐秘区域的通行凭证。"
   }
 ]

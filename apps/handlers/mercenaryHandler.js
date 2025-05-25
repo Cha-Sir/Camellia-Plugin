@@ -5,15 +5,14 @@
  * @description 处理佣兵招募、列表查看、详情查看等功能。
  */
 
-import { getPlayerData, savePlayerData, getMercenaries, mercenaryImagePath } from '../../utils/dataManager.js';
+import { getPlayerData, savePlayerData, getMercenaries, mercenaryImagePath, getUpMercenaryPool } from '../../utils/dataManager.js';
 import { makeForwardMsgWithContent } from '../../utils/messageHelper.js';
-import * as constants from '../../utils/constants.js'; // Import all constants for easier access
+import * as constants from '../../utils/constants.js';
 import path from 'path';
 import fs from 'fs';
 
 /** Helper: Get current date in YYYY-MM-DD format */
 function getCurrentDateString() {
-    // ... (保持不变)
     const today = new Date();
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -25,30 +24,35 @@ function getCurrentDateString() {
  * 根据概率表随机选择一个佣兵，并考虑5星保底机制。
  * @param {object} playerData - 玩家数据，用于获取5星保底的额外概率。
  * @param {number} [minRarityPity=0] - 由于十连保底机制，强制要求的最低稀有度 (0表示不强制)。
+ * @param {string[]} [poolMercenaryIds=null] - 可选参数，限定招募池的佣兵ID列表。如果为null或空，则使用全部佣兵。
  * @returns {object|null} 选中的佣兵对象，如果无法选择则返回 null。
  */
-function getRandomMercenaryByProbability(playerData, minRarityPity = 0) {
-    const mercenaries = getMercenaries();
-    if (!mercenaries || mercenaries.length === 0) return null;
+function getRandomMercenaryByProbability(playerData, minRarityPity = 0, poolMercenaryIds = null) {
+    let sourceMercenaries = getMercenaries();
+    if (!sourceMercenaries || sourceMercenaries.length === 0) return null;
 
-    // 十连的稀有度保底优先于5星概率提升
+    if (poolMercenaryIds && Array.isArray(poolMercenaryIds) && poolMercenaryIds.length > 0) {
+        sourceMercenaries = sourceMercenaries.filter(m => poolMercenaryIds.includes(m.id));
+        if (sourceMercenaries.length === 0) {
+            logger.warn(`[MercenaryHandler] 限定招募池为空或所有限定佣兵ID无效。无法招募。`);
+            return null;
+        }
+    }
+
     if (minRarityPity > 0) {
-        const candidatesPoolPity = mercenaries.filter(m => m.rarity >= minRarityPity);
+        const candidatesPoolPity = sourceMercenaries.filter(m => m.rarity >= minRarityPity);
         if (candidatesPoolPity.length > 0) {
             return candidatesPoolPity[Math.floor(Math.random() * candidatesPoolPity.length)];
         }
-        // 如果没有符合minRarityPity的，则回退到正常概率池（不太可能发生，除非数据配置有问题）
-        logger.warn(`[MercenaryHandler] No mercenaries found with minRarityPity ${minRarityPity}. Falling back to standard pool with 5-star pity.`);
+        logger.warn(`[MercenaryHandler] 在当前池中未找到稀有度 >= ${minRarityPity} 的佣兵。将回退到当前池的普通概率。`);
     }
 
-    // 应用5星保底的额外概率
     const currentBonus5StarRate = playerData.current5StarBonusRate || 0.0;
     const modifiedProbabilities = { ...constants.MERCENARY_RARITY_PROBABILITY };
 
     if (currentBonus5StarRate > 0) {
         const base5StarProb = constants.MERCENARY_RARITY_PROBABILITY[5] || 0;
         let effective5StarProb = Math.min(1.0, base5StarProb + currentBonus5StarRate);
-
         modifiedProbabilities[5] = effective5StarProb;
 
         let sumProbNon5StarBase = 0;
@@ -58,8 +62,8 @@ function getRandomMercenaryByProbability(playerData, minRarityPity = 0) {
             }
         }
 
-        if (sumProbNon5StarBase > 0) { // Avoid division by zero if only 5-stars exist or base 5-star prob is 1
-            const remainingProbSpaceNew = Math.max(0, 1.0 - effective5StarProb); // Ensure non-negative
+        if (sumProbNon5StarBase > 0) {
+            const remainingProbSpaceNew = Math.max(0, 1.0 - effective5StarProb);
             const scaleFactor = remainingProbSpaceNew / sumProbNon5StarBase;
             for (const r in modifiedProbabilities) {
                 if (parseInt(r, 10) !== 5) {
@@ -73,14 +77,12 @@ function getRandomMercenaryByProbability(playerData, minRarityPity = 0) {
                 }
             }
         }
-        // Normalize probabilities to sum to 1.0 due to potential floating point issues
         let currentSum = 0;
         Object.values(modifiedProbabilities).forEach(p => currentSum +=p);
-        if(currentSum > 0 && Math.abs(currentSum - 1.0) > 1e-9) { // Check if sum is significantly different from 1
+        if(currentSum > 0 && Math.abs(currentSum - 1.0) > 1e-9) {
             for(const r in modifiedProbabilities) modifiedProbabilities[r] /= currentSum;
         }
     }
-
 
     const randomNumber = Math.random();
     let cumulativeProbability = 0;
@@ -101,21 +103,22 @@ function getRandomMercenaryByProbability(playerData, minRarityPity = 0) {
     if (chosenRarity === null) {
         if (sortedRarities.length > 0) {
             chosenRarity = sortedRarities[sortedRarities.length -1];
-            logger.warn(`[MercenaryHandler] chosenRarity was null after loop, falling back to highest available rarity ${chosenRarity}. Random: ${randomNumber}, Cumul: ${cumulativeProbability}`);
+            logger.warn(`[MercenaryHandler] chosenRarity was null, falling back to highest available rarity ${chosenRarity}. Random: ${randomNumber}, Cumul: ${cumulativeProbability}`);
         } else {
-            logger.error("[MercenaryHandler] Could not determine chosenRarity and no rarities defined in probability map.");
-            return mercenaries.length > 0 ? mercenaries[Math.floor(Math.random() * mercenaries.length)] : null;
+            logger.error("[MercenaryHandler] Could not determine chosenRarity, no rarities in probability map.");
+            return sourceMercenaries.length > 0 ? sourceMercenaries[Math.floor(Math.random() * sourceMercenaries.length)] : null;
         }
     }
 
-    const finalCandidates = mercenaries.filter(m => m.rarity === chosenRarity);
+    const finalCandidates = sourceMercenaries.filter(m => m.rarity === chosenRarity);
     if (finalCandidates.length > 0) {
         return finalCandidates[Math.floor(Math.random() * finalCandidates.length)];
     } else {
-        logger.warn(`[MercenaryHandler] Rarity ${chosenRarity} (potentially affected by pity) has no recruitable mercenaries. Falling back to any mercenary.`);
-        return mercenaries.length > 0 ? mercenaries[Math.floor(Math.random() * mercenaries.length)] : null;
+        logger.warn(`[MercenaryHandler] 在当前池中，稀有度 ${chosenRarity} 没有可招募佣兵。将从当前池随机选择一个。`);
+        return sourceMercenaries.length > 0 ? sourceMercenaries[Math.floor(Math.random() * sourceMercenaries.length)] : null;
     }
 }
+
 
 /**
  * 处理单个佣兵的获取逻辑，包括进阶、满级奖励和5星保底计数。
@@ -141,12 +144,10 @@ export function processMercenaryAcquisition(playerData, recruitedMercDef) {
     let rewardType = null;
     let unlockedSkillDescription = null;
 
-    // Ensure fields exist
     playerData.seedsOfLight = playerData.seedsOfLight || 0;
     playerData.pityCounter5Star = playerData.pityCounter5Star || 0;
     playerData.current5StarBonusRate = playerData.current5StarBonusRate || 0.0;
     playerData.mercenaries = playerData.mercenaries || [];
-
 
     const existingMerc = playerData.mercenaries.find(m => m.mercenaryId === recruitedMercDef.id);
 
@@ -161,7 +162,7 @@ export function processMercenaryAcquisition(playerData, recruitedMercDef) {
                 unlockedSkillDescription = newSkill.description;
                 message += `\n解锁新技能：${unlockedSkillDescription}`;
             }
-        } else { // At max evolution level
+        } else {
             gotMaxLevelReward = true;
             if (recruitedMercDef.rarity >= 3 && constants.SEED_OF_LIGHT_GAIN_ON_DUPLICATE[recruitedMercDef.rarity]) {
                 const seedsFromDupe = constants.SEED_OF_LIGHT_GAIN_ON_DUPLICATE[recruitedMercDef.rarity];
@@ -177,7 +178,7 @@ export function processMercenaryAcquisition(playerData, recruitedMercDef) {
                 message = `佣兵 ${recruitedMercDef.name} (${"★".repeat(recruitedMercDef.rarity)}) 已达最高进阶，转化为 ${goldFromDupe} 资金。`;
             }
         }
-    } else { // New mercenary
+    } else {
         playerData.mercenaries.push({
             mercenaryId: recruitedMercDef.id,
             evolutionLevel: 1,
@@ -191,11 +192,10 @@ export function processMercenaryAcquisition(playerData, recruitedMercDef) {
         }
     }
 
-    // 更新5星保底计数器
     if (recruitedMercDef.rarity === 5) {
         playerData.pityCounter5Star = 0;
         playerData.current5StarBonusRate = 0.0;
-        message += " (✨✨✨✨✨)"; // 标记获得5星
+        message += " (✨✨✨✨✨)";
     } else {
         playerData.pityCounter5Star++;
         if (playerData.pityCounter5Star > constants.PITY_5STAR_THRESHOLD) {
@@ -225,11 +225,11 @@ export async function handleRecruitMercenary(e, pluginInstance) {
     }
 
     playerData.funds -= constants.MERCENARY_RECRUIT_COST;
-    const recruitedMercDef = getRandomMercenaryByProbability(playerData);
+    const recruitedMercDef = getRandomMercenaryByProbability(playerData, 0, null);
 
     if (!recruitedMercDef) {
         await savePlayerData(userId, playerData);
-        return e.reply("招募信号受到严重干扰，未能成功连接到佣兵网络。资金已消耗。");
+        return e.reply("招募信号受到严重干扰，未能成功连接到佣兵网络或当前池中无符合条件佣兵。资金已消耗。");
     }
 
     const acquisitionResult = processMercenaryAcquisition(playerData, recruitedMercDef);
@@ -271,92 +271,84 @@ export async function handleRecruitMercenary(e, pluginInstance) {
 /**
  * Internal logic for performing ten recruits with pity.
  * @param {object} playerDataInput - Player's data (will be deep copied and modified).
+ * @param {string[]} [poolMercenaryIds=null] - Optional. Array of mercenary IDs to restrict the recruitment pool.
  * @returns {object} { playerDataUpdated: object, forwardContentItems: Array<string|object>, error?: string }
  */
-async function _performTenRecruits(playerDataInput) {
+async function _performTenRecruits(playerDataInput, poolMercenaryIds = null) {
     let currentPlayerData = JSON.parse(JSON.stringify(playerDataInput));
 
-    const mercenariesData = getMercenaries();
-    if (!mercenariesData || mercenariesData.length === 0) {
+    let sourceMercenaries = getMercenaries();
+    if (!sourceMercenaries || sourceMercenaries.length === 0) {
         return { error: "佣兵数据库异常，暂无法招募。请联系管理员。" };
     }
+    if (poolMercenaryIds && Array.isArray(poolMercenaryIds) && poolMercenaryIds.length > 0) {
+        const initialPoolSize = sourceMercenaries.filter(m => poolMercenaryIds.includes(m.id)).length;
+        if (initialPoolSize === 0) {
+            return { error: "当前UP池中没有可招募的佣兵或UP池配置错误。" };
+        }
+    }
 
-    const finalResultsDefinitions = []; // Store the actual merc definitions recruited
-    let resultsForMessage = []; // Store messages and image objects for forwardMsg
-    let hasGuaranteed3Star = false; // For 10-pull 3-star pity
+
+    const finalResultsDefinitions = [];
+    let resultsForMessage = [];
+    let hasGuaranteed3Star = false;
 
     for (let i = 0; i < 10; i++) {
-        const recruitedMercDef = getRandomMercenaryByProbability(currentPlayerData);
+        const recruitedMercDef = getRandomMercenaryByProbability(currentPlayerData, 0, poolMercenaryIds);
 
         if (recruitedMercDef) {
-            finalResultsDefinitions.push(recruitedMercDef); // Store the actual definition
+            finalResultsDefinitions.push(recruitedMercDef);
             if (recruitedMercDef.rarity >= constants.TEN_PULL_GUARANTEE_MIN_RARITY) {
                 hasGuaranteed3Star = true;
             }
-            // Process acquisition and update currentPlayerData immediately for next pull
             const acquisitionResult = processMercenaryAcquisition(currentPlayerData, recruitedMercDef);
             currentPlayerData = acquisitionResult.playerData;
             resultsForMessage.push({ mercDef: recruitedMercDef, message: acquisitionResult.message, unlockedSkill: acquisitionResult.unlockedSkillDescription });
         } else {
-            finalResultsDefinitions.push(null); // Mark failed pull
-            // Even if a pull fails, it should count towards pity
+            finalResultsDefinitions.push(null);
             currentPlayerData.pityCounter5Star = (currentPlayerData.pityCounter5Star || 0) + 1;
             if (currentPlayerData.pityCounter5Star > constants.PITY_5STAR_THRESHOLD) {
                 currentPlayerData.current5StarBonusRate = (currentPlayerData.current5StarBonusRate || 0.0) + constants.PITY_5STAR_RATE_INCREMENT;
                 currentPlayerData.current5StarBonusRate = Math.min(currentPlayerData.current5StarBonusRate, 0.95);
             }
-            resultsForMessage.push({ mercDef: null, message: "招募信号干扰，此次招募失败。", unlockedSkill: null });
+            resultsForMessage.push({ mercDef: null, message: "招募信号干扰/池中无符合条件佣兵，此次招募失败。", unlockedSkill: null });
         }
     }
 
-    // Handle 10-pull 3-star pity if necessary
     let tenPullPityTriggeredMsg = "";
     if (!hasGuaranteed3Star) {
         tenPullPityTriggeredMsg = "✨ 十连保底机制已触发！本次招募至少包含一名三星以上佣兵。 ✨";
         let replacementIndex = -1;
-        let lowestRarityFound = 99; // Start with a high number
+        let lowestRarityFound = 99;
 
-        // Find the lowest actual rarity non-null mercenary to replace
         for (let i = 0; i < finalResultsDefinitions.length; i++) {
             if (finalResultsDefinitions[i] && finalResultsDefinitions[i].rarity < lowestRarityFound) {
                 lowestRarityFound = finalResultsDefinitions[i].rarity;
                 replacementIndex = i;
             }
         }
-        // If all pulls failed or were already high rarity, replace the first one
         if (replacementIndex === -1) replacementIndex = 0;
 
-        // Temporarily "undo" the pity count for the merc being replaced
         const replacedMercDefOriginal = finalResultsDefinitions[replacementIndex];
         if (replacedMercDefOriginal && replacedMercDefOriginal.rarity < 5) {
-            currentPlayerData.pityCounter5Star--; // It was incremented for this pull
-            if (currentPlayerData.pityCounter5Star > constants.PITY_5STAR_THRESHOLD -1) { // Check if it was the one that triggered rate increase
-                // This part is complex; simpler to just let the new pull re-evaluate pity
-            }
-        } else if (replacedMercDefOriginal && replacedMercDefOriginal.rarity === 5) {
-            // If we are replacing a 5-star (highly unlikely with lowestRarity logic), pity was reset.
-            // This situation needs careful thought, but lowestRarity logic should prevent it.
-        } else if (replacedMercDefOriginal === null) { // If replacing a failed pull
-            currentPlayerData.pityCounter5Star--; // It was incremented for this null pull
+            currentPlayerData.pityCounter5Star--;
+        } else if (replacedMercDefOriginal === null) {
+            currentPlayerData.pityCounter5Star--;
         }
 
-
-        const guaranteed3StarMercDef = getRandomMercenaryByProbability(currentPlayerData, constants.TEN_PULL_GUARANTEE_MIN_RARITY);
+        const guaranteed3StarMercDef = getRandomMercenaryByProbability(currentPlayerData, constants.TEN_PULL_GUARANTEE_MIN_RARITY, poolMercenaryIds);
 
         if (guaranteed3StarMercDef) {
-            finalResultsDefinitions[replacementIndex] = guaranteed3StarMercDef; // Update the actual definition
-            // Re-process acquisition for this specific slot with the new merc and update currentPlayerData
+            finalResultsDefinitions[replacementIndex] = guaranteed3StarMercDef;
             const acquisitionResultPity = processMercenaryAcquisition(currentPlayerData, guaranteed3StarMercDef);
             currentPlayerData = acquisitionResultPity.playerData;
-            // Update the message for this slot
             resultsForMessage[replacementIndex] = { mercDef: guaranteed3StarMercDef, message: acquisitionResultPity.message, unlockedSkill: acquisitionResultPity.unlockedSkillDescription };
         } else {
-            logger.error("[MercenaryHandler] 10-pull pity: Could not find a guaranteed 3-star+ mercenary.");
-            tenPullPityTriggeredMsg = ""; // Pity failed
+            logger.error("[MercenaryHandler] 10-pull pity: Could not find a guaranteed 3-star+ mercenary from the current pool.");
+            tenPullPityTriggeredMsg = "保底尝试失败: 未能从当前池找到三星以上佣兵。";
         }
     }
 
-    // Construct forward message content from resultsForMessage
     const forwardContentItems = [];
     if (tenPullPityTriggeredMsg) {
         forwardContentItems.push(tenPullPityTriggeredMsg);
@@ -396,7 +388,7 @@ export async function handleRecruitMercenaryTenTimes(e, pluginInstance) {
     }
     playerData.funds -= cost;
 
-    const recruitOutcome = await _performTenRecruits(playerData);
+    const recruitOutcome = await _performTenRecruits(playerData, null);
     if (recruitOutcome.error) {
         playerData.funds += cost;
         await savePlayerData(userId, playerData);
@@ -438,7 +430,7 @@ export async function handleDailyFreeTenPull(e, pluginInstance) {
         return e.reply(`【${nickname}】您今天已经进行过每日免费十连招募了，请明天再来吧！`);
     }
 
-    const recruitOutcome = await _performTenRecruits(playerData);
+    const recruitOutcome = await _performTenRecruits(playerData, null);
     if (recruitOutcome.error) {
         return e.reply(recruitOutcome.error);
     }
@@ -467,9 +459,6 @@ export async function handleDailyFreeTenPull(e, pluginInstance) {
     return true;
 }
 
-
-// ... (handleListPlayerMercenaries, handleViewMercenaryDetail, handleEvolveMercenary 保持不变，但它们内部显示pity信息的部分已在之前版本添加) ...
-// 为了完整性，这里也提供这些函数的更新版本，确保它们能显示保底信息
 
 export async function handleListPlayerMercenaries(e, pluginInstance) {
     const userId = e.user_id;
@@ -549,7 +538,7 @@ export async function handleListPlayerMercenaries(e, pluginInstance) {
         forwardContentItems.push("[系统提示] 部分失效佣兵数据已自动清理。");
     }
 
-    if (actualMercNodesCount === 0 && !madeChangesToPlayerData) { // Should be caught by initial check or above block
+    if (actualMercNodesCount === 0 && !madeChangesToPlayerData) {
         let replyMsg = `您当前没有有效的佣兵。 (光之种: ${playerData.seedsOfLight || 0})\n`;
         replyMsg += `(5星保底计数: ${playerData.pityCounter5Star || 0}/${constants.PITY_5STAR_THRESHOLD}, 当前额外5星率: ${((playerData.current5StarBonusRate || 0) * 100).toFixed(1)}%)\n`;
         replyMsg += `使用 #查看佣兵 <序号/名称> 获取佣兵详细信息。\n使用 #进阶 <序号/名称> 消耗光之种提升佣兵。`;
@@ -787,6 +776,199 @@ export async function handleEvolveMercenary(e, pluginInstance) {
     } else {
         await e.reply(evolutionContent.filter(item => typeof item === 'string' || typeof item === 'object' && item.type !== 'image').join('\n'));
     }
+
+    return true;
+}
+
+// --- 新增功能 ---
+
+/**
+ * 查看当前所有可招募佣兵的卡池信息。
+ */
+export async function handleViewMercenaryPool(e, pluginInstance) {
+    const allMercenaries = getMercenaries();
+    if (!allMercenaries || allMercenaries.length === 0) {
+        return e.reply("当前佣兵数据库为空，无法查看卡池。");
+    }
+
+    const content = [];
+    content.push(`--- 卡莫利安佣兵总览 ---`);
+
+    // 处理UP池 (置顶)
+    const upPoolIds = getUpMercenaryPool();
+    const upMercsGroupedByRarity = {};
+    if (upPoolIds && upPoolIds.length > 0) {
+        const upMercs = allMercenaries.filter(m => upPoolIds.includes(m.id))
+            .sort((a, b) => b.rarity - a.rarity || a.name.localeCompare(b.name)); // UP池内部也排序
+
+        if (upMercs.length > 0) {
+            content.push(`\n--- 当前UP池佣兵 (招募指令: #UP招募 / #UP十连) ---`);
+            upMercs.forEach(merc => {
+                if (!upMercsGroupedByRarity[merc.rarity]) {
+                    upMercsGroupedByRarity[merc.rarity] = [];
+                }
+                upMercsGroupedByRarity[merc.rarity].push(`${merc.name} (UP!)`);
+            });
+
+            // 按稀有度降序添加到content
+            Object.keys(upMercsGroupedByRarity).map(Number).sort((a, b) => b - a).forEach(rarity => {
+                let rarityNode = `【${"★".repeat(rarity)} (${rarity}星) - UP池】\n`;
+                rarityNode += upMercsGroupedByRarity[rarity].join('、 ');
+                content.push(rarityNode);
+            });
+        } else {
+            content.push(`\n--- 当前UP池为空或配置错误 ---`);
+        }
+    } else {
+        content.push(`\n--- 当前无UP池活动 ---`);
+    }
+
+    content.push(`\n--- 常驻卡池佣兵 (招募指令: #随机招募 / #随机十连) ---`);
+    // 处理常驻池 (排除已在UP池中显示过的，如果UP池佣兵也存在于常驻池的话)
+    // 为了简化，这里我们假设UP池是完全独立的，或者如果UP池佣兵也在常驻池，则在常驻池列表中也显示它们（但没有UP标记）
+    // 如果要严格区分，需要更复杂的过滤逻辑
+
+    const regularMercsGroupedByRarity = {};
+    const sortedAllMercenaries = [...allMercenaries].sort((a, b) => {
+        if (b.rarity !== a.rarity) return b.rarity - a.rarity;
+        return a.name.localeCompare(b.name);
+    });
+
+    for (const merc of sortedAllMercenaries) {
+        if (!regularMercsGroupedByRarity[merc.rarity]) {
+            regularMercsGroupedByRarity[merc.rarity] = [];
+        }
+        regularMercsGroupedByRarity[merc.rarity].push(merc.name);
+    }
+
+    Object.keys(regularMercsGroupedByRarity).map(Number).sort((a, b) => b - a).forEach(rarity => {
+        let rarityNode = `【${"★".repeat(rarity)} (${rarity}星) - 常驻池】\n`;
+        rarityNode += regularMercsGroupedByRarity[rarity].join('、 ');
+        content.push(rarityNode);
+    });
+
+
+    const forwardMsg = await makeForwardMsgWithContent(content, "佣兵卡池情报", true); // true for forceSeparateTextNodes
+    if (forwardMsg) {
+        await e.reply(forwardMsg);
+    } else {
+        await e.reply("无法生成佣兵卡池情报，请稍后再试。");
+    }
+    return true;
+}
+
+
+/**
+ * 处理UP池单次招募
+ */
+export async function handleRecruitMercenaryUP(e, pluginInstance) {
+    const userId = e.user_id;
+    const nickname = e.sender.card || e.sender.nickname || `调查员${String(userId).slice(-4)}`;
+    let { playerData } = await pluginInstance.getPlayer(userId, nickname);
+
+    if (!playerData) return e.reply("身份验证失败，无法进行招募。");
+
+    const upPoolIds = getUpMercenaryPool();
+    if (!upPoolIds || upPoolIds.length === 0) {
+        return e.reply("当前没有UP招募活动，请关注后续公告。");
+    }
+
+    if (playerData.funds < constants.MERCENARY_UP_RECRUIT_COST) {
+        return e.reply(`资金不足！UP招募需要 ${constants.MERCENARY_UP_RECRUIT_COST} 资金，您当前持有 ${playerData.funds}。`);
+    }
+
+    const allMercenaries = getMercenaries();
+    const validUpMercsInPool = allMercenaries.filter(m => upPoolIds.includes(m.id));
+    if (validUpMercsInPool.length === 0) {
+        return e.reply("UP池配置错误或池中无有效佣兵，暂无法招募。请联系管理员。");
+    }
+
+
+    playerData.funds -= constants.MERCENARY_UP_RECRUIT_COST;
+    const recruitedMercDef = getRandomMercenaryByProbability(playerData, 0, upPoolIds);
+
+    if (!recruitedMercDef) {
+        await savePlayerData(userId, playerData);
+        return e.reply("UP招募信号受到严重干扰，或UP池中当前无符合条件佣兵。资金已消耗。");
+    }
+
+    const acquisitionResult = processMercenaryAcquisition(playerData, recruitedMercDef);
+    playerData = acquisitionResult.playerData;
+
+    await savePlayerData(userId, playerData);
+
+    const singleRecruitContent = [
+        `--- UP招募结果 ---`,
+        acquisitionResult.message,
+        `剩余资金: ${playerData.funds}`,
+        `当前光之种: ${playerData.seedsOfLight || 0}`,
+        `(5星保底计数: ${playerData.pityCounter5Star}/${constants.PITY_5STAR_THRESHOLD}, 当前额外5星率: ${(playerData.current5StarBonusRate * 100).toFixed(1)}%)`
+    ];
+
+    if (recruitedMercDef.imageUrl) {
+        const imageFullPath = path.join(mercenaryImagePath, recruitedMercDef.imageUrl);
+        if (fs.existsSync(imageFullPath)) {
+            singleRecruitContent.push({ type: 'image', file: recruitedMercDef.imageUrl });
+        } else {
+            singleRecruitContent.push(`[图片 ${recruitedMercDef.imageUrl} 加载失败]`);
+        }
+    }
+
+    const forwardMsg = await makeForwardMsgWithContent(singleRecruitContent, "UP佣兵招募凭证");
+    if (forwardMsg) await e.reply(forwardMsg);
+    else await e.reply(singleRecruitContent.filter(item => typeof item === 'string').join('\n'));
+
+    return true;
+}
+
+/**
+ * 处理UP池十连招募
+ */
+export async function handleRecruitMercenaryTenTimesUP(e, pluginInstance) {
+    const userId = e.user_id;
+    const nickname = e.sender.card || e.sender.nickname || `调查员${String(userId).slice(-4)}`;
+    let { playerData } = await pluginInstance.getPlayer(userId, nickname);
+
+    if (!playerData) return e.reply("身份验证失败，无法进行招募。");
+
+    const upPoolIds = getUpMercenaryPool();
+    if (!upPoolIds || upPoolIds.length === 0) {
+        return e.reply("当前没有UP招募活动，请关注后续公告。");
+    }
+
+    const allMercenaries = getMercenaries();
+    const validUpMercsInPool = allMercenaries.filter(m => upPoolIds.includes(m.id));
+    if (validUpMercsInPool.length === 0) {
+        return e.reply("UP池配置错误或池中无有效佣兵，暂无法招募。请联系管理员。");
+    }
+
+    const cost = constants.MERCENARY_UP_RECRUIT_TEN_COST;
+    if (playerData.funds < cost) {
+        return e.reply(`资金不足！UP十连招募需要 ${cost} 资金，您当前持有 ${playerData.funds}。`);
+    }
+    playerData.funds -= cost;
+
+    const recruitOutcome = await _performTenRecruits(playerData, upPoolIds);
+    if (recruitOutcome.error) {
+        playerData.funds += cost;
+        await savePlayerData(userId, playerData);
+        return e.reply(recruitOutcome.error);
+    }
+
+    playerData = recruitOutcome.playerDataUpdated;
+
+    const finalForwardContent = [
+        `--- ${nickname} 的UP十连招募报告 (消耗 ${cost} 资金) ---`,
+        ...recruitOutcome.forwardContentItems,
+        `\n--- 招募结束 ---\n剩余资金: ${playerData.funds}\n当前光之种: ${playerData.seedsOfLight || 0}`,
+        `(5星保底计数: ${playerData.pityCounter5Star}/${constants.PITY_5STAR_THRESHOLD}, 当前额外5星率: ${(playerData.current5StarBonusRate * 100).toFixed(1)}%)`
+    ];
+
+    await savePlayerData(userId, playerData);
+
+    const forwardMsg = await makeForwardMsgWithContent(finalForwardContent, "UP十连招募详细报告", false);
+    if (forwardMsg) await e.reply(forwardMsg);
+    else await e.reply(finalForwardContent.filter(item => typeof item === 'string').join('\n'));
 
     return true;
 }

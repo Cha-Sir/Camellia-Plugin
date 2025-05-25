@@ -185,7 +185,7 @@
     "description": "街头巷战的粗犷改装，专治各种不服。由【街边收尾人】杰克持有。"
   },
   {
-    "name": "制式脉冲步枪",
+    "name": "制式脉冲步枪（哨兵型）",
     "price": 0,
     "baseCombatPower": 140,
     "passive": "连发射击",
@@ -208,5 +208,17 @@
     "passiveDescription": "标准装备，无特殊机能。",
     "rarity": "普通",
     "description": "一把破旧的砍刀。"
+  },
+  {
+    "name": "“幽影”干扰器",
+    "price": 0,
+    "baseCombatPower": 10,
+    "passive": "短暂隐匿",
+    "passiveType": "evasion_boost_post_combat",
+    "passiveValue": 0.20,
+    "passiveDescription": "战斗失利后，有20%额外几率无伤或轻伤脱离。",
+    "rarity": "罕见",
+    "type": "weapon",
+    "description": "一个实验性的干扰装置，能在短时间内扭曲使用者的光学信号，辅助撤退。"
   }
 ]

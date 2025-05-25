@@ -19,7 +19,7 @@ export const VALID_STRATEGIES = Object.keys(STRATEGY_PROBABILITY);
 export const MAX_MESSAGE_LENGTH = 350;
 
 // 避战策略在战斗前成功逃脱的概率
-export const EVASIVE_PRE_COMBAT_ESCAPE_CHANCE = 0.4; // 40%
+export const EVASIVE_PRE_COMBAT_ESCAPE_CHANCE = 0.8; // 40%
 
 // 战败后无伤逃脱的概率
 export const POST_COMBAT_ESCAPE_UNHARMED_CHANCE = 0.15; // 15%
@@ -115,6 +115,9 @@ export const SEED_SHOP_CONFIG = {
         { rarity: 3, count: 3, price: 50 }
     ]
 };
-
+export const MERCENARY_UP_RECRUIT_COST = 200;
+export const MERCENARY_UP_RECRUIT_TEN_COST = 1900;
+export const AI_ARENA_COOLDOWN_MINUTES = 10;
 // 用于在 dataManager 中定义文件名
 export const DAILY_SEED_SHOP_FILE_NAME = 'dailySeedShop.json';
+export const UP_POOL_FILE_NAME = 'upMercenaryPool.json';

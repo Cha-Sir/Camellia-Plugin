@@ -1,15 +1,18 @@
 // camellia-plugin/utils/dataManager.js
 import fs from 'fs-extra';
 import path from 'path';
-import { INITIAL_WEAPON_NAME, VALID_STRATEGIES, DAILY_SEED_SHOP_FILE_NAME } from './constants.js'
+import { INITIAL_WEAPON_NAME, VALID_STRATEGIES, DAILY_SEED_SHOP_FILE_NAME, UP_POOL_FILE_NAME } from './constants.js' // Added UP_POOL_FILE_NAME
 
 const _path = process.cwd();
 const pluginRootPath = path.join(_path, 'plugins', 'camellia-plugin');
 const pluginDataDir = path.join(pluginRootPath, 'data');
-const DAILY_SEED_SHOP_FILE = path.join(pluginDataDir, DAILY_SEED_SHOP_FILE_NAME); // 新增
+const DAILY_SEED_SHOP_FILE = path.join(pluginDataDir, DAILY_SEED_SHOP_FILE_NAME);
+const UP_POOL_FILE = path.join(pluginDataDir, UP_POOL_FILE_NAME); // 新增UP池文件路径
+
 
 // ... (之前的数据变量声明) ...
-let dailySeedShopData = { lastRefreshDate: "", items: [] }; // 新增
+let dailySeedShopData = { lastRefreshDate: "", items: [] };
+let upMercenaryPoolData = []; // 新增，存储UP池佣兵ID列表
 
 try {
     fs.ensureDirSync(pluginDataDir);
@@ -45,6 +48,7 @@ let currentActivityText = "";
 let npcsData = [];
 let mercenariesData = [];
 
+
 /**
  * 加载所有基础游戏数据.
  */
@@ -60,6 +64,15 @@ async function loadAllBaseData() {
         mercenariesData = await fs.readJson(MERCENARY_FILE, { throws: false }) || [];
         dailySeedShopData = await fs.readJson(DAILY_SEED_SHOP_FILE, { throws: false }) || { lastRefreshDate: "", items: [] };
         if (!dailySeedShopData.items) dailySeedShopData.items = [];
+
+        // 加载UP池数据
+        upMercenaryPoolData = await fs.readJson(UP_POOL_FILE, { throws: false }) || [];
+        if (!Array.isArray(upMercenaryPoolData)) { // 确保是数组
+            currentLogger.warn(`[AdventureGame/DataManager] ${UP_POOL_FILE_NAME} 内容不是一个有效的数组，已重置为空数组。`);
+            upMercenaryPoolData = [];
+        }
+
+
         if (await fs.pathExists(ACTIVITY_TEXT_FILE)) {
             currentActivityText = await fs.readFile(ACTIVITY_TEXT_FILE, 'utf-8');
         } else {
@@ -77,7 +90,9 @@ async function loadAllBaseData() {
         if (titlesData.length === 0) currentLogger.info('[AdventureGame/DataManager] 提示: titles.json 为空或加载失败。');
         if (npcsData.length === 0) currentLogger.warn('[AdventureGame/DataManager] 警告: npcs.json 为空或加载失败 (NPC系统可能无法正常运作)。');
         if (mercenariesData.length === 0) currentLogger.warn('[AdventureGame/DataManager] 警告: mercenaries.json 为空或加载失败 (佣兵系统可能无法正常运作)。');
+        if (upMercenaryPoolData.length === 0) currentLogger.info('[AdventureGame/DataManager] 提示: upMercenaryPool.json 为空或加载失败 (UP池当前无佣兵)。');
         if (!dailySeedShopData.lastRefreshDate) currentLogger.info('[AdventureGame/DataManager] 提示: dailySeedShop.json 为空或首次加载，商店将在首次访问时刷新。');
+
 
         let initialWeapon = weaponsData.find(w => w.name === INITIAL_WEAPON_NAME);
         if (!initialWeapon) {
@@ -118,6 +133,7 @@ function getCurrentActivityText() { return currentActivityText; }
 function getNpcs() { return npcsData; }
 function getMercenaries() { return mercenariesData; }
 function getDailySeedShopData() { return dailySeedShopData; }
+function getUpMercenaryPool() { return upMercenaryPoolData; } // 新增 getter
 
 export const mercenaryImagePath = path.join(pluginDataDir, 'mercenary_images');
 
@@ -166,11 +182,11 @@ async function getPlayerData(userId, nickname = '') {
             hasClaimedNewbieGift: false,
             lastFreeTenPullDate: "",
             seedsOfLight: 0,
-            // 新增：5星保底相关字段
             pityCounter5Star: 0,
-            current5StarBonusRate: 0.0
+            current5StarBonusRate: 0.0,
+            lastAiArenaEntryTime: 0 // 新增AI竞技场冷却时间戳
         };
-        if (weaponsData.length === 0) await loadAllBaseData(); // Ensure base data is loaded for INITIAL_WEAPON_NAME
+        if (weaponsData.length === 0) await loadAllBaseData();
 
         const saveSuccess = await savePlayerData(userId, finalPlayerData);
         if (saveSuccess) {
@@ -199,9 +215,9 @@ async function getPlayerData(userId, nickname = '') {
         if (typeof finalPlayerData.hasClaimedNewbieGift === 'undefined') finalPlayerData.hasClaimedNewbieGift = false;
         if (typeof finalPlayerData.lastFreeTenPullDate === 'undefined') finalPlayerData.lastFreeTenPullDate = "";
         if (typeof finalPlayerData.seedsOfLight === 'undefined') finalPlayerData.seedsOfLight = 0;
-        // 初始化老玩家的5星保底字段
         if (typeof finalPlayerData.pityCounter5Star === 'undefined') finalPlayerData.pityCounter5Star = 0;
         if (typeof finalPlayerData.current5StarBonusRate === 'undefined') finalPlayerData.current5StarBonusRate = 0.0;
+        if (typeof finalPlayerData.lastAiArenaEntryTime === 'undefined') finalPlayerData.lastAiArenaEntryTime = 0; // 确保老玩家也有此字段
 
 
         if (nickname && finalPlayerData.nickname !== nickname) {
@@ -267,6 +283,7 @@ export {
     savePlayerData,
     getAllPlayerData,
     pluginDataDir,
-    getDailySeedShopData, // 导出
+    getDailySeedShopData,
     saveDailySeedShopData,
+    getUpMercenaryPool, // 导出UP池数据获取函数
 };

@@ -4,17 +4,21 @@
  * @file 竞技场系统相关逻辑处理器。
  */
 
-import { getPlayerData, savePlayerData, getMercenaries, mercenaryImagePath } from '../../utils/dataManager.js'; // Added mercenaryImagePath
+import { getPlayerData, savePlayerData, getMercenaries, mercenaryImagePath } from '../../utils/dataManager.js';
 import { makeForwardMsgWithContent } from '../../utils/messageHelper.js';
 import {
     ARENA_TEAM_SIZE,
     ARENA_WIN_REWARD_MIN,
     ARENA_WIN_REWARD_MAX,
     ARENA_AI_API_ENDPOINT,
-    ARENA_AI_MODEL_NAME, ARENA_BATTLE_MIN_TURNS, ARENA_BATTLE_MAX_TURNS
+    ARENA_AI_MODEL_NAME,
+    ARENA_BATTLE_MIN_TURNS,
+    ARENA_BATTLE_MAX_TURNS,
+    AI_ARENA_COOLDOWN_MINUTES,
+    MERCENARY_MAX_EVOLUTION_LEVEL
 } from '../../utils/constants.js';
-import path from 'path'; // For MVP image
-import fs from 'fs';   // For MVP image
+import path from 'path';
+import fs from 'fs';
 
 let fetch;
 try {
@@ -23,8 +27,8 @@ try {
     logger.error('[ArenaHandler] 未能加载 node-fetch。竞技场AI对战功能将不可用。请确保已安装 node-fetch (npm i node-fetch@2)。');
 }
 
-const CUSTOM_AI_API_ENDPOINT = "api2.aigcbest.top/v1/chat/completions"; // Your endpoint
-const CUSTOM_AI_API_KEY = "sk-1VPFgLrJ952VJQNc19Dd7678B4D74fAeAfFdFd8a0f31A3C7"; // Your key
+const CUSTOM_AI_API_ENDPOINT = "api2.aigcbest.top/v1/chat/completions";
+const CUSTOM_AI_API_KEY = "sk-1VPFgLrJ952VJQNc19Dd7678B4D74fAeAfFdFd8a0f31A3C7";
 
 const arenaQueue = [];
 
@@ -34,9 +38,13 @@ export async function handleSetArenaTeam(e, pluginInstance) {
     const { playerData } = await pluginInstance.getPlayer(userId, nickname);
 
     if (!playerData) return e.reply("身份验证失败，无法配置队伍。");
-    if (!playerData.mercenaries || playerData.mercenaries.length < ARENA_TEAM_SIZE) {
-        return e.reply(`您的佣兵数量不足 ${ARENA_TEAM_SIZE} 名，无法组成竞技场队伍。请先 #随机招募 更多佣兵。`);
+    if (!playerData.mercenaries || playerData.mercenaries.length === 0) {
+        return e.reply(`您的佣兵数量不足，无法组成竞技场队伍。请先 #随机招募 佣兵。`);
     }
+    if (playerData.mercenaries.length < ARENA_TEAM_SIZE) {
+        return e.reply(`您的佣兵数量不足 ${ARENA_TEAM_SIZE} 名，无法组成竞技场队伍。当前拥有 ${playerData.mercenaries.length} 名，请先 #随机招募 更多佣兵。`);
+    }
+
 
     const teamSelection = e.msg.replace(/^#佣兵配队\s*/, "").trim();
     const selectedIndices = teamSelection.split(/[,，\s]+/).map(s => parseInt(s.trim(), 10) -1);
@@ -46,44 +54,30 @@ export async function handleSetArenaTeam(e, pluginInstance) {
     }
 
     const newTeamMercenaryIds = [];
-    const allMercenariesDefs = getMercenaries(); // 获取所有佣兵定义
+    const allMercenariesDefs = getMercenaries();
 
-    // --- START OF FIX ---
-    // 获取并排序玩家拥有的佣兵列表，确保与 #佣兵列表 的显示顺序一致
-    // 这个列表将包含佣兵的持有信息 (owned) 和完整定义 (def)
     const playerOwnedMercsForSelection = playerData.mercenaries
         .map(owned => {
             const def = allMercenariesDefs.find(m => m.id === owned.mercenaryId);
-            return { ...owned, def }; // 将持有的佣兵数据与完整定义合并
+            return { ...owned, def };
         })
-        .filter(m => m.def) // 确保佣兵定义存在，以防数据不一致
+        .filter(m => m.def)
         .sort((a, b) => {
-            // 应用与 handleListPlayerMercenaries (以及 handleViewMercenaryDetail) 中相同的排序逻辑:
-            // 1. 按稀有度降序 (高星在前)
-            // 2. 相同稀有度下，按进阶等级降序 (高等级在前)
             if (b.def.rarity !== a.def.rarity) {
                 return b.def.rarity - a.def.rarity;
             }
             return b.evolutionLevel - a.evolutionLevel;
         });
-    // --- END OF FIX ---
 
 
     const chosenTeamNames = [];
     const uniqueCheck = new Set();
 
-    for (const index of selectedIndices) { // selectedIndices 是 (玩家输入序号 - 1)
-        // --- MODIFIED PART ---
-        // 从排序后的列表 playerOwnedMercsForSelection 中获取佣兵
+    for (const index of selectedIndices) {
         if (isNaN(index) || index < 0 || index >= playerOwnedMercsForSelection.length) {
-            // --- END OF MODIFIED PART ---
             return e.reply(`输入的选择序号 "${index + 1}" 无效。请使用 #佣兵列表 查看您的佣兵及其序号。`);
         }
-        // --- MODIFIED PART ---
-        const selectedMercData = playerOwnedMercsForSelection[index]; // 从排序后的列表获取
-        // selectedMercData 现在的结构是 { mercenaryId, evolutionLevel, def: MercDefinition }
-        // --- END OF MODIFIED PART ---
-
+        const selectedMercData = playerOwnedMercsForSelection[index];
         if (uniqueCheck.has(selectedMercData.mercenaryId)) {
             return e.reply(`队伍中不能包含重复的佣兵。佣兵 "${selectedMercData.def.name}" 被选择了多次。`);
         }
@@ -199,6 +193,19 @@ export async function handleLeaveArenaQueue(e, pluginInstance) {
     return true;
 }
 
+// Helper function to format team details for the initial battle log node
+function formatTeamForBattleLog(playerInfo) {
+    let teamLog = `指挥官: ${playerInfo.nickname}\n队伍阵容:\n`;
+    playerInfo.team.forEach(merc => {
+        teamLog += `  - ${merc.name} (${"★".repeat(merc.rarity)}, Lv.${merc.evolutionLevel})\n`;
+        // Optionally add 1-2 key skills if desired, but keep it concise for this node
+        // const mainSkills = merc.skills.filter(s => s.levelRequired <= merc.evolutionLevel).slice(0,1);
+        // if(mainSkills.length > 0) teamLog += `    技能示例: ${mainSkills[0].description.substring(0,20)}...\n`;
+    });
+    return teamLog.trim();
+}
+
+
 async function processArenaBattle(player1, player2, pluginInstance) {
     if (!fetch) {
         const errorMsg = "竞技场战斗模块配置错误（无法加载HTTP请求库），战斗无法进行。请联系管理员。";
@@ -209,7 +216,7 @@ async function processArenaBattle(player1, player2, pluginInstance) {
     const prepareTeamPrompt = (playerInfo) => {
         let teamPrompt = `${playerInfo.nickname}的队伍：\n`;
         playerInfo.team.forEach(merc => {
-            teamPrompt += `- ${merc.name} (ID: ${merc.id}, 稀有度: ${"★".repeat(merc.rarity)}, 进阶等级: ${merc.evolutionLevel})\n`; // Added ID for MVP
+            teamPrompt += `- ${merc.name} (ID: ${merc.id}, 稀有度: ${"★".repeat(merc.rarity)}, 进阶等级: ${merc.evolutionLevel})\n`;
             teamPrompt += `  简介: ${merc.description}\n`;
             teamPrompt += `  已解锁技能:\n`;
             merc.skills.filter(s => s.levelRequired <= merc.evolutionLevel).forEach(skill => {
@@ -228,7 +235,7 @@ async function processArenaBattle(player1, player2, pluginInstance) {
     const fullPrompt = `以下是两位指挥官在竞技场的佣兵队伍配置。
 每个佣兵都有一个唯一的ID。除了最终的mvp数组，不要在其他地方返回ID，星级等其他影响文本观看效果的数据。
 注意每个角色都是一个独特的角色，你不应该仅仅模拟出战斗过程，还有生动形象地体现角色的特征，甚至可以生成对白等。这是一场时空混乱处的战斗，请用小说的风格描述这场混战
-一般来说，星级越高，进阶等级越高的角色越强，请你依据此来判断战斗双方的强弱，当然也可以包含一些团队合作中的随机性。
+一般来说，星级越高，进阶等级越高的角色越强，请你依据此来判断战斗双方的强弱，但这并不是决定性的作用，更重要的是技能之间的配合等
 请模拟一场精彩的战斗，战斗过程应包含 ${minTurns} 到 ${maxTurns} 个回合。每个回合结束部分你都应该简要描述这回合双方的伤亡情况。
 每个角色的名字，技能前都应该用【】包裹。
 请严格以JSON格式返回你的回答，JSON对象必须包含以下三个键：
@@ -259,7 +266,7 @@ ${player2PromptInfo}
         const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('AI API request timed out after 300 seconds')), 300000)
         );
-        const fetchPromise = fetch(`https://${CUSTOM_AI_API_ENDPOINT}`, { // Ensure https for custom endpoint
+        const fetchPromise = fetch(`https://${CUSTOM_AI_API_ENDPOINT}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -306,7 +313,6 @@ ${player2PromptInfo}
 
         logger.debug('[ArenaHandler] Parsed AI battle data:', JSON.stringify(aiResponseData, null, 2));
 
-        // Validate structure for new MVP field
         if (!Array.isArray(aiResponseData.combatTurns) || typeof aiResponseData.resultLog !== 'string' || typeof aiResponseData.mvpMercenaryId !== 'string') {
             logger.error('[ArenaHandler] AI response missing mvpMercenaryId or other fields.', aiResponseData);
             throw new Error('AI返回的JSON内容不符合预期 (combatTurns应为数组, resultLog和mvpMercenaryId应为字符串)');
@@ -326,7 +332,7 @@ ${player2PromptInfo}
     let loserEntry = null;
     const combatTurns = aiResponseData.combatTurns || ["AI未能提供详细战斗回合记录。"];
     const resultLog = aiResponseData.resultLog || "AI未能判定胜负。";
-    const mvpMercenaryId = aiResponseData.mvpMercenaryId; // MVP ID
+    const mvpMercenaryId = aiResponseData.mvpMercenaryId;
 
     if (resultLog.toLowerCase().includes(player1.nickname.toLowerCase())) {
         winnerEntry = player1;
@@ -337,17 +343,24 @@ ${player2PromptInfo}
     }
 
     const settlementContent = [];
-    settlementContent.push("--- 竞技场战报 ---"); // Node 1: Title
-    settlementContent.push("【战斗过程】:");     // Node 2: Section Title
+    // --- MODIFICATION START ---
+    // Node 1: Team Lineup
+    let teamLineupNode = `--- 竞技场对阵 ---`;
+    teamLineupNode += `\n\n${formatTeamForBattleLog(player1)}`;
+    teamLineupNode += `\n\n------ VS ------\n\n`;
+    teamLineupNode += `${formatTeamForBattleLog(player2)}`;
+    settlementContent.push(teamLineupNode);
+    // --- MODIFICATION END ---
 
-    combatTurns.forEach((turnDescription, index) => { // Each turn is a new node
+    settlementContent.push("--- 【战斗过程】 ---"); // Section Title for turns
+
+    combatTurns.forEach((turnDescription, index) => {
         settlementContent.push(`--- 回合 ${index + 1} ---\n${turnDescription}`);
     });
 
-    settlementContent.push("--- 【战斗结果】 ---"); // New node for result section title
-    settlementContent.push(resultLog); // New node for result log
+    settlementContent.push("--- 【战斗结果】 ---");
+    settlementContent.push(resultLog);
 
-    // MVP Display
     if (mvpMercenaryId) {
         const allMercs = getMercenaries();
         const mvpDef = allMercs.find(m => m.id === mvpMercenaryId);
@@ -359,8 +372,6 @@ ${player2PromptInfo}
                     settlementContent.push({ type: 'image', file: mvpDef.imageUrl });
                 } else {
                     logger.warn(`[ArenaHandler] MVP image not found: ${imageFullPath}`);
-                    // Optionally add a text placeholder if image fails to load,
-                    // if forceSeparateTextNodes is true, this text will also be a new node.
                     settlementContent.push(`[MVP图片 ${mvpDef.imageUrl} 加载失败]`);
                 }
             }
@@ -369,10 +380,11 @@ ${player2PromptInfo}
         }
     }
 
-
     const rewardAmount = Math.floor(Math.random() * (ARENA_WIN_REWARD_MAX - ARENA_WIN_REWARD_MIN + 1)) + ARENA_WIN_REWARD_MIN;
 
-    if (winnerEntry && loserEntry) {
+    const isPvpMatch = player1.userId !== 'AI_OPPONENT' && player2.userId !== 'AI_OPPONENT';
+
+    if (winnerEntry && loserEntry && isPvpMatch) {
         const { playerData: winnerData } = await pluginInstance.getPlayer(winnerEntry.userId);
         const { playerData: loserData } = await pluginInstance.getPlayer(loserEntry.userId);
 
@@ -392,28 +404,30 @@ ${player2PromptInfo}
         } else {
             settlementContent.push(`\n${loserEntry.nickname} 本场失利。无法同步其资金惩罚 (玩家数据获取失败)。`);
         }
-
+    } else if (winnerEntry && winnerEntry.userId !== 'AI_OPPONENT' && loserEntry && loserEntry.userId === 'AI_OPPONENT') {
+        const { playerData: winnerData } = await pluginInstance.getPlayer(winnerEntry.userId);
+        if (winnerData) {
+            winnerData.funds += rewardAmount;
+            await savePlayerData(winnerEntry.userId, winnerData);
+            settlementContent.push(`\n恭喜 ${winnerEntry.nickname} 战胜了幻影竞技者AI！奖励 ${rewardAmount} 资金！\n${winnerEntry.nickname} 当前资金: ${winnerData.funds}`);
+        } else {
+            settlementContent.push(`\n${winnerEntry.nickname} 战胜了AI！但无法同步其资金奖励 (玩家数据获取失败)。`);
+        }
+    } else if (winnerEntry && winnerEntry.userId === 'AI_OPPONENT' && loserEntry && loserEntry.userId !== 'AI_OPPONENT') {
+        settlementContent.push(`\n很遗憾，${loserEntry.nickname} 未能战胜幻影竞技者AI。再接再厉！`);
     } else {
         settlementContent.push("\n本场战斗结果未明确或为平局，无资金奖惩。");
     }
 
-    // 修改此处调用，传递 true
-    sendArenaMessageToBothWithForward(player1, player2, settlementContent, "竞技场结算", true); // <<<< 添加 true
+    // Ensure forceSeparateNodesForArena is true so each string in settlementContent becomes a node
+    sendArenaMessageToBothWithForward(player1, player2, settlementContent, "竞技场结算", true);
 }
 
 
 function sendArenaMessageToBoth(player1, player2, message, title = "竞技场通知") {
     const fullMessage = `${title ? `[${title}] ` : ''}${message}`;
 
-    if (player1.groupId && player1.groupId === player2.groupId) {
-        if (global.Bot?.pickGroup(player1.groupId)) {
-            logger.debug(`[ArenaHandler] Sending single message to common group ${player1.groupId}`);
-            global.Bot.pickGroup(player1.groupId).sendMsg(fullMessage).catch(err => logger.error(`Error sending to common group ${player1.groupId}:`, err));
-        } else if (player1.e) {
-            logger.debug(`[ArenaHandler] Fallback: Sending single message via player1's event to common group`);
-            player1.e.reply(fullMessage).catch(err => logger.error(`Error replying via player1's event:`, err));
-        }
-    } else {
+    if (player1.userId !== 'AI_OPPONENT') {
         if (player1.groupId && global.Bot?.pickGroup(player1.groupId)) {
             logger.debug(`[ArenaHandler] Sending message to player1's group ${player1.groupId}`);
             global.Bot.pickGroup(player1.groupId).sendMsg(fullMessage).catch(err => logger.error(`Error sending to player1's group ${player1.groupId}:`, err));
@@ -421,40 +435,34 @@ function sendArenaMessageToBoth(player1, player2, message, title = "竞技场通
             logger.debug(`[ArenaHandler] Fallback: Sending message via player1's event`);
             player1.e.reply(fullMessage).catch(err => logger.error(`Error replying via player1's event:`, err));
         }
+    }
 
-        if (player2.groupId && global.Bot?.pickGroup(player2.groupId)) {
-            logger.debug(`[ArenaHandler] Sending message to player2's group ${player2.groupId}`);
-            global.Bot.pickGroup(player2.groupId).sendMsg(fullMessage).catch(err => logger.error(`Error sending to player2's group ${player2.groupId}:`, err));
-        } else if (player2.e) {
-            logger.debug(`[ArenaHandler] Fallback: Sending message via player2's event`);
-            player2.e.reply(fullMessage).catch(err => logger.error(`Error replying via player2's event:`, err));
+    if (player2.userId !== 'AI_OPPONENT' && player1.userId !== player2.userId) {
+        if (player1.userId === 'AI_OPPONENT' || player1.groupId !== player2.groupId) {
+            if (player2.groupId && global.Bot?.pickGroup(player2.groupId)) {
+                logger.debug(`[ArenaHandler] Sending message to player2's group ${player2.groupId}`);
+                global.Bot.pickGroup(player2.groupId).sendMsg(fullMessage).catch(err => logger.error(`Error sending to player2's group ${player2.groupId}:`, err));
+            } else if (player2.e) {
+                logger.debug(`[ArenaHandler] Fallback: Sending message via player2's event`);
+                player2.e.reply(fullMessage).catch(err => logger.error(`Error replying via player2's event:`, err));
+            }
         }
     }
 }
 
-async function sendArenaMessageToBothWithForward(player1, player2, contentArray, title = "竞技场情报", forceSeparateNodesForArena = false) { // <<<< 添加参数
-    // 修改此处调用，传递 forceSeparateNodesForArena
-    const forwardMsg = await makeForwardMsgWithContent(contentArray, title, forceSeparateNodesForArena); // <<<< 使用参数
+async function sendArenaMessageToBothWithForward(player1, player2, contentArray, title = "竞技场情报", forceSeparateNodesForArena = false) {
+    const forwardMsg = await makeForwardMsgWithContent(contentArray, title, forceSeparateNodesForArena);
     if (!forwardMsg) {
         logger.warn(`[ArenaHandler] Failed to create forward message for title: ${title}. Sending plain text fallback.`);
         const fallbackText = contentArray
             .filter(item => typeof item === 'string' || (typeof item === 'object' && item.type !== 'image'))
-            .map(item => typeof item === 'string' ? item : JSON.stringify(item)) // Basic fallback, might include "[object Object]"
+            .map(item => typeof item === 'string' ? item : JSON.stringify(item))
             .join('\n');
         sendArenaMessageToBoth(player1, player2, fallbackText.substring(0, 1000) + (fallbackText.length > 1000 ? "\n...(消息过长)" : ""), title);
         return;
     }
 
-    // ... (其余发送逻辑保持不变) ...
-    if (player1.groupId && player1.groupId === player2.groupId) {
-        if (global.Bot?.pickGroup(player1.groupId)) {
-            logger.debug(`[ArenaHandler] Sending single forward message to common group ${player1.groupId}`);
-            global.Bot.pickGroup(player1.groupId).sendMsg(forwardMsg).catch(err => logger.error(`Error sending forward msg to common group ${player1.groupId}:`, err));
-        } else if (player1.e) {
-            logger.debug(`[ArenaHandler] Fallback: Sending single forward message via player1's event to common group`);
-            player1.e.reply(forwardMsg).catch(err => logger.error(`Error replying forward msg via player1's event:`, err));
-        }
-    } else {
+    if (player1.userId !== 'AI_OPPONENT') {
         if (player1.groupId && global.Bot?.pickGroup(player1.groupId)) {
             logger.debug(`[ArenaHandler] Sending forward message to player1's group ${player1.groupId}`);
             global.Bot.pickGroup(player1.groupId).sendMsg(forwardMsg).catch(err => logger.error(`Error sending forward msg to player1's group ${player1.groupId}:`, err));
@@ -462,13 +470,92 @@ async function sendArenaMessageToBothWithForward(player1, player2, contentArray,
             logger.debug(`[ArenaHandler] Fallback: Sending forward message via player1's event`);
             player1.e.reply(forwardMsg).catch(err => logger.error(`Error replying forward msg via player1's event:`, err));
         }
+    }
 
-        if (player2.groupId && global.Bot?.pickGroup(player2.groupId)) {
-            logger.debug(`[ArenaHandler] Sending forward message to player2's group ${player2.groupId}`);
-            global.Bot.pickGroup(player2.groupId).sendMsg(forwardMsg).catch(err => logger.error(`Error sending forward msg to player2's group ${player2.groupId}:`, err));
-        } else if (player2.e) {
-            logger.debug(`[ArenaHandler] Fallback: Sending forward message via player2's event`);
-            player2.e.reply(forwardMsg).catch(err => logger.error(`Error replying forward msg via player2's event:`, err));
+    if (player2.userId !== 'AI_OPPONENT' && player1.userId !== player2.userId) {
+        if (player1.userId === 'AI_OPPONENT' || player1.groupId !== player2.groupId) {
+            if (player2.groupId && global.Bot?.pickGroup(player2.groupId)) {
+                logger.debug(`[ArenaHandler] Sending forward message to player2's group ${player2.groupId}`);
+                global.Bot.pickGroup(player2.groupId).sendMsg(forwardMsg).catch(err => logger.error(`Error sending forward msg to player2's group ${player2.groupId}:`, err));
+            } else if (player2.e) {
+                logger.debug(`[ArenaHandler] Fallback: Sending forward message via player2's event`);
+                player2.e.reply(forwardMsg).catch(err => logger.error(`Error replying forward msg via player2's event:`, err));
+            }
         }
     }
+}
+
+// --- 新增 AI 竞技场功能 ---
+export async function handleJoinAiArena(e, pluginInstance) {
+    const userId = e.user_id;
+    const rawNickname = e.sender.card || e.sender.nickname || `调查员${String(userId).slice(-4)}`;
+    let { playerData } = await pluginInstance.getPlayer(userId, rawNickname);
+
+    if (!playerData) return e.reply("身份验证失败，无法进入AI竞技场。");
+
+    const now = Date.now();
+    const cooldownMillis = AI_ARENA_COOLDOWN_MINUTES * 60 * 1000;
+    if (playerData.lastAiArenaEntryTime && (now - playerData.lastAiArenaEntryTime < cooldownMillis)) {
+        const timeLeft = Math.ceil((cooldownMillis - (now - playerData.lastAiArenaEntryTime)) / 60000);
+        return e.reply(`您刚挑战过幻影竞技者，请在 ${timeLeft} 分钟后再来。`);
+    }
+
+    if (!playerData.arenaTeam || playerData.arenaTeam.length !== ARENA_TEAM_SIZE) {
+        return e.reply(`您尚未配置完整的竞技场队伍 (${ARENA_TEAM_SIZE}名佣兵)。请使用 #佣兵配队 进行设置。`);
+    }
+
+    const allMercenariesDefs = getMercenaries();
+    if (!allMercenariesDefs || allMercenariesDefs.length < ARENA_TEAM_SIZE) {
+        return e.reply("佣兵数据库不足，无法生成AI对手。请联系管理员。");
+    }
+
+    const playerTeamDetails = [];
+    for (const mercId of playerData.arenaTeam) {
+        const ownedMerc = playerData.mercenaries.find(m => m.mercenaryId === mercId);
+        const mercDef = allMercenariesDefs.find(m => m.id === mercId);
+        if (!ownedMerc || !mercDef) {
+            return e.reply(`您的竞技场队伍中包含无效佣兵 (${mercId})。请重新 #佣兵配队。`);
+        }
+        playerTeamDetails.push({ ...mercDef, evolutionLevel: ownedMerc.evolutionLevel });
+    }
+    const playerNickname = playerData.activeTitle ? `【${playerData.activeTitle}】${playerData.nickname}` : playerData.nickname;
+    const player1Entry = {
+        userId: userId,
+        nickname: playerNickname,
+        team: playerTeamDetails,
+        groupId: e.group_id,
+        e: e
+    };
+
+    const aiTeamDetails = [];
+    const availableMercsForAi = [...allMercenariesDefs];
+
+    for (let i = 0; i < ARENA_TEAM_SIZE; i++) {
+        if (availableMercsForAi.length === 0) break;
+
+        let randomIndex = Math.floor(Math.random() * availableMercsForAi.length);
+        let aiMercDef = availableMercsForAi.splice(randomIndex, 1)[0];
+
+        const randomEvoLevel = Math.floor(Math.random() * MERCENARY_MAX_EVOLUTION_LEVEL) + 1;
+        aiTeamDetails.push({ ...aiMercDef, evolutionLevel: randomEvoLevel });
+    }
+    if (aiTeamDetails.length < ARENA_TEAM_SIZE) {
+        return e.reply("未能为AI生成完整的队伍，请稍后再试或联系管理员。");
+    }
+
+
+    const aiOpponentEntry = {
+        userId: 'AI_OPPONENT',
+        nickname: '幻影竞技者AI',
+        team: aiTeamDetails
+    };
+
+    playerData.lastAiArenaEntryTime = now;
+    await savePlayerData(userId, playerData);
+
+    e.reply(`已进入AI竞技场！您的对手是 ${aiOpponentEntry.nickname}。战斗即将开始...`);
+    logger.info(`[ArenaHandler] 玩家 ${playerNickname} (ID: ${userId}) 进入AI竞技场。`);
+
+    await processArenaBattle(player1Entry, aiOpponentEntry, pluginInstance);
+    return true;
 }

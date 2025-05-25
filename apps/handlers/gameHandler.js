@@ -10,7 +10,8 @@ import {
     POST_COMBAT_ESCAPE_UNHARMED_CHANCE,
     POST_COMBAT_ESCAPE_WOUNDED_CHANCE,
     INJURY_LEVELS,
-    VALID_STRATEGIES
+    VALID_STRATEGIES,
+    EVASIVE_PRE_COMBAT_ESCAPE_CHANCE // <--- 添加这个常量
 } from '../../utils/constants.js';
 
 
@@ -941,22 +942,36 @@ export async function processGameInstance(mapName, pluginInstanceFromApp) {
                 pool.gameProcessLog.push(`\n[${participantDisplayName}] (策略: ${playerInGame.strategy}, 状态: ${playerInGame.status}) 准备 ${actionType}...`);
 
                 if (actionType === '搜寻') {
+                    pool.gameProcessLog.push(`\n[${participantDisplayName}] (策略: ${playerInGame.strategy}, 状态: ${playerInGame.status}) 准备 ${actionType}...`);
                     await performSearchAction(playerInGame, pool, allItems, allWeapons, publicItems, pool.gameProcessLog, currentPluginInstance);
-                } else {
-                    const potentialTargets = pool.players.filter(p => p.userId !== playerInGame.userId && (p.status === 'active' || p.status === 'wounded'));
-                    if (potentialTargets.length === 0) {
-                        pool.gameProcessLog.push(`  [${participantDisplayName}] 未侦测到其他活动目标。`);
-                        if (playerInGame.strategy === '猛攻') {
-                            pool.gameProcessLog.push(`  [${participantDisplayName}] (猛攻策略) 转为强行搜寻！`);
-                            await performSearchAction(playerInGame, pool, allItems, allWeapons, publicItems, pool.gameProcessLog, currentPluginInstance);
-                        }
+                } else { // actionType === '遭遇'
+                    pool.gameProcessLog.push(`\n[${participantDisplayName}] (策略: ${playerInGame.strategy}, 状态: ${playerInGame.status}) 准备 ${actionType}...`);
+
+                    // 检查是否为“避战”策略，并尝试在战斗前逃脱
+                    if (playerInGame.strategy === '避战' && Math.random() < EVASIVE_PRE_COMBAT_ESCAPE_CHANCE) {
+                        pool.gameProcessLog.push(`  [${participantDisplayName}] (避战策略) 成功侦测并避开了潜在冲突，转为搜寻物资！`);
+                        await performSearchAction(playerInGame, pool, allItems, allWeapons, publicItems, pool.gameProcessLog, currentPluginInstance);
                     } else {
-                        let target = potentialTargets[Math.floor(Math.random() * potentialTargets.length)];
-                        const targetType = target.isNpc ? "NPC" : "调查员";
-                        pool.gameProcessLog.push(`  [${participantDisplayName}] 锁定了${targetType}目标 [${getFormattedNickname(target)}] (装备: ${target.weapon.name}, 状态: ${target.status})！`);
-                        await performCombat(playerInGame, target, pool, allWeapons, currentPluginInstance);
+                        // 如果不是“避战”策略，或者“避战”逃脱失败，则进入战斗流程
+                        const potentialTargets = pool.players.filter(p => p.userId !== playerInGame.userId && (p.status === 'active' || p.status === 'wounded'));
+                        if (potentialTargets.length === 0) {
+                            pool.gameProcessLog.push(`  [${participantDisplayName}] 未侦测到其他活动目标。`);
+                            if (playerInGame.strategy === '猛攻') { // 猛攻策略在无目标时也会尝试搜寻
+                                pool.gameProcessLog.push(`  [${participantDisplayName}] (猛攻策略) 转为强行搜寻！`);
+                                await performSearchAction(playerInGame, pool, allItems, allWeapons, publicItems, pool.gameProcessLog, currentPluginInstance);
+                            }
+                            // 对于其他策略（包括避战失败后无目标），此次“遭遇”行动等于未发现目标
+                        } else {
+                            let target = potentialTargets[Math.floor(Math.random() * potentialTargets.length)];
+                            const targetType = target.isNpc ? "NPC" : "调查员";
+                            // 如果是避战策略但逃脱失败，日志中可以体现
+                            const evasionFailedMsg = (playerInGame.strategy === '避战') ? '(避战失败) ' : '';
+                            pool.gameProcessLog.push(`  [${participantDisplayName}] ${evasionFailedMsg}锁定了${targetType}目标 [${getFormattedNickname(target)}] (装备: ${target.weapon.name}, 状态: ${target.status})！`);
+                            await performCombat(playerInGame, target, pool, allWeapons, currentPluginInstance);
+                        }
                     }
                 }
+                // --- 修改结束 ---
             }
             participant.actionsTaken++;
             if (participant.status === 'defeated' || participant.status === 'escaped') continue;

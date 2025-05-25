@@ -7,7 +7,7 @@ import { mercenaryImagePath } from './dataManager.js'; // 假设此文件存在�
  * @file 消息处理相关的辅助函数。
  */
 
-const DEFAULT_LINE_WRAP_THRESHOLD = 60; // 每行文字的推荐最大长度，可根据实际效果调整
+const DEFAULT_LINE_WRAP_THRESHOLD = 150; // 每行文字的推荐最大长度，可根据实际效果调整
 const PREFERRED_BREAK_CHARS = "，。！？；,.;"; // 优先在这些标点后换行
 
 /**
