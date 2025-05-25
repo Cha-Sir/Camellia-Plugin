@@ -403,3 +403,50 @@ export async function handleToggleAutoHeal(e, pluginInstance) {
     await savePlayerData(userId, playerData);
     return e.reply(`自动治疗功能已 ${playerData.autoHealEnabled ? '开启' : '关闭'}。`);
 }
+
+export async function handleSetFixedNickname(e, pluginInstance) {
+    const userId = e.user_id;
+    const newNicknameRaw = e.msg.replace(/^#改名\s*/, "").trim();
+
+    if (!newNicknameRaw) {
+        return e.reply("请提供您想要设置的新昵称，例如：#改名 我的新名字\n若要取消固定昵称，请输入：#改名 无");
+    }
+
+    // 优先使用 pluginInstance.getPlayer 获取数据，如果 pluginInstance 可用
+    // 否则，直接调用 getPlayerData。这里假设 pluginInstance 总是可用的。
+    const { playerData } = await pluginInstance.getPlayer(userId, e.sender.card || e.sender.nickname);
+    if (!playerData) {
+        return e.reply("身份验证失败，无法更改昵称。");
+    }
+
+    if (newNicknameRaw.toLowerCase() === '无' || newNicknameRaw.toLowerCase() === 'none') {
+        if (!playerData.fixedNickname || playerData.fixedNickname.trim() === "") {
+            return e.reply("您当前未使用固定昵称。");
+        }
+        playerData.fixedNickname = ""; // 清空固定昵称
+        // 重新从事件中获取动态昵称以更新 playerData.nickname
+        const dynamicNickname = e.sender.card || e.sender.nickname || `调查员${String(userId).slice(-4)}`;
+        playerData.nickname = dynamicNickname;
+
+        // 使用从 dataManager.js 导入的 savePlayerData
+        await savePlayerData(userId, playerData);
+        const currentDisplayNickname = playerData.activeTitle ? `【${playerData.activeTitle}】${playerData.nickname}` : playerData.nickname;
+        return e.reply(`已取消固定昵称。您当前的显示昵称将随群名片等变动，当前为：${currentDisplayNickname}`);
+    }
+
+    const newNickname = newNicknameRaw; // 可以进行一些清理，比如去除不可见字符，但trim已经处理了首尾空格
+
+    if (newNickname.length > 20) { // 简单的长度限制
+        return e.reply("抱歉，昵称过长，请保持在20个字符以内。");
+    }
+    // 这里可以添加更多验证，如屏蔽词等 (如果需要)
+
+    playerData.fixedNickname = newNickname;
+    playerData.nickname = newNickname; // 立即更新当前 playerData 中的 nickname
+
+    // 使用从 dataManager.js 导入的 savePlayerData
+    await savePlayerData(userId, playerData);
+
+    const displayedNickname = playerData.activeTitle ? `【${playerData.activeTitle}】${playerData.nickname}` : playerData.nickname;
+    return e.reply(`昵称已成功固定为：${displayedNickname}`);
+}

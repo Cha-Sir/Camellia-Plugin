@@ -198,9 +198,6 @@ function formatTeamForBattleLog(playerInfo) {
     let teamLog = `指挥官: ${playerInfo.nickname}\n队伍阵容:\n`;
     playerInfo.team.forEach(merc => {
         teamLog += `  - ${merc.name} (${"★".repeat(merc.rarity)}, Lv.${merc.evolutionLevel})\n`;
-        // Optionally add 1-2 key skills if desired, but keep it concise for this node
-        // const mainSkills = merc.skills.filter(s => s.levelRequired <= merc.evolutionLevel).slice(0,1);
-        // if(mainSkills.length > 0) teamLog += `    技能示例: ${mainSkills[0].description.substring(0,20)}...\n`;
     });
     return teamLog.trim();
 }
@@ -209,7 +206,7 @@ function formatTeamForBattleLog(playerInfo) {
 async function processArenaBattle(player1, player2, pluginInstance) {
     if (!fetch) {
         const errorMsg = "竞技场战斗模块配置错误（无法加载HTTP请求库），战斗无法进行。请联系管理员。";
-        sendArenaMessageToBoth(player1, player2, errorMsg, "竞技场错误");
+        sendArenaMessageToBoth(player1, player2, errorMsg, "竞技场错误"); // FIX: Pass pluginInstance
         return;
     }
 
@@ -324,7 +321,7 @@ ${player2PromptInfo}
 
     } catch (error) {
         logger.error('[ArenaHandler] 与AI交互或解析响应时发生错误:', error);
-        sendArenaMessageToBoth(player1, player2, `竞技场战斗模拟失败: ${error.message}。双方均不扣除/获得奖励。`, "战斗模拟异常");
+        sendArenaMessageToBoth(player1, player2, `竞技场战斗模拟失败: ${error.message}。双方均不扣除/获得奖励。`, "战斗模拟异常"); // FIX: Pass pluginInstance
         return;
     }
 
@@ -343,16 +340,13 @@ ${player2PromptInfo}
     }
 
     const settlementContent = [];
-    // --- MODIFICATION START ---
-    // Node 1: Team Lineup
     let teamLineupNode = `--- 竞技场对阵 ---`;
     teamLineupNode += `\n\n${formatTeamForBattleLog(player1)}`;
     teamLineupNode += `\n\n------ VS ------\n\n`;
     teamLineupNode += `${formatTeamForBattleLog(player2)}`;
     settlementContent.push(teamLineupNode);
-    // --- MODIFICATION END ---
 
-    settlementContent.push("--- 【战斗过程】 ---"); // Section Title for turns
+    settlementContent.push("--- 【战斗过程】 ---");
 
     combatTurns.forEach((turnDescription, index) => {
         settlementContent.push(`--- 回合 ${index + 1} ---\n${turnDescription}`);
@@ -418,27 +412,34 @@ ${player2PromptInfo}
     } else {
         settlementContent.push("\n本场战斗结果未明确或为平局，无资金奖惩。");
     }
-
-    // Ensure forceSeparateNodesForArena is true so each string in settlementContent becomes a node
     sendArenaMessageToBothWithForward(player1, player2, settlementContent, "竞技场结算", true);
 }
 
 
 function sendArenaMessageToBoth(player1, player2, message, title = "竞技场通知") {
     const fullMessage = `${title ? `[${title}] ` : ''}${message}`;
+    let p1MessageSentToGroupId = null;
 
+    // --- Send to Player 1 ---
     if (player1.userId !== 'AI_OPPONENT') {
         if (player1.groupId && global.Bot?.pickGroup(player1.groupId)) {
             logger.debug(`[ArenaHandler] Sending message to player1's group ${player1.groupId}`);
-            global.Bot.pickGroup(player1.groupId).sendMsg(fullMessage).catch(err => logger.error(`Error sending to player1's group ${player1.groupId}:`, err));
+            global.Bot.pickGroup(player1.groupId).sendMsg(fullMessage)
+                .then(() => { p1MessageSentToGroupId = player1.groupId; })
+                .catch(err => logger.error(`Error sending to player1's group ${player1.groupId}:`, err));
         } else if (player1.e) {
             logger.debug(`[ArenaHandler] Fallback: Sending message via player1's event`);
             player1.e.reply(fullMessage).catch(err => logger.error(`Error replying via player1's event:`, err));
         }
     }
 
+    // --- Send to Player 2 ---
     if (player2.userId !== 'AI_OPPONENT' && player1.userId !== player2.userId) {
-        if (player1.userId === 'AI_OPPONENT' || player1.groupId !== player2.groupId) {
+        // If P2 is in the same group P1's message was successfully sent to, P2 already got it.
+        if (player2.groupId && player2.groupId === p1MessageSentToGroupId) {
+            logger.debug(`[ArenaHandler] P2 (${player2.nickname}) in same group as P1 (${p1MessageSentToGroupId}), plain message already sent to group.`);
+        } else {
+            // P2 is in a different group, or P1's message was a reply / P1 is AI. Send to P2.
             if (player2.groupId && global.Bot?.pickGroup(player2.groupId)) {
                 logger.debug(`[ArenaHandler] Sending message to player2's group ${player2.groupId}`);
                 global.Bot.pickGroup(player2.groupId).sendMsg(fullMessage).catch(err => logger.error(`Error sending to player2's group ${player2.groupId}:`, err));
@@ -462,21 +463,44 @@ async function sendArenaMessageToBothWithForward(player1, player2, contentArray,
         return;
     }
 
+    let p1MessageSentToGroupId = null;
+
+    // --- Send to Player 1 ---
     if (player1.userId !== 'AI_OPPONENT') {
         if (player1.groupId && global.Bot?.pickGroup(player1.groupId)) {
             logger.debug(`[ArenaHandler] Sending forward message to player1's group ${player1.groupId}`);
-            global.Bot.pickGroup(player1.groupId).sendMsg(forwardMsg).catch(err => logger.error(`Error sending forward msg to player1's group ${player1.groupId}:`, err));
+            try {
+                await global.Bot.pickGroup(player1.groupId).sendMsg(forwardMsg);
+                p1MessageSentToGroupId = player1.groupId;
+            } catch (err) {
+                logger.error(`Error sending forward msg to player1's group ${player1.groupId}:`, err);
+                if (player1.e) { // Fallback to reply if group send fails
+                    logger.debug(`[ArenaHandler] Fallback after group send fail: Sending forward message via player1's event`);
+                    player1.e.reply(forwardMsg).catch(errReply => logger.error(`Error replying forward msg via player1's event after group fail:`, errReply));
+                }
+            }
         } else if (player1.e) {
             logger.debug(`[ArenaHandler] Fallback: Sending forward message via player1's event`);
             player1.e.reply(forwardMsg).catch(err => logger.error(`Error replying forward msg via player1's event:`, err));
         }
     }
 
+    // --- Send to Player 2 ---
     if (player2.userId !== 'AI_OPPONENT' && player1.userId !== player2.userId) {
-        if (player1.userId === 'AI_OPPONENT' || player1.groupId !== player2.groupId) {
+        // If P2 is in the same group P1's message was successfully sent to, P2 already got it.
+        if (player2.groupId && player2.groupId === p1MessageSentToGroupId) {
+            logger.debug(`[ArenaHandler] P2 (${player2.nickname}) in same group as P1 (${p1MessageSentToGroupId}), forward message already sent to group.`);
+        } else {
+            // P2 is in a different group, or P1's message was a reply / P1 is AI. Send to P2.
             if (player2.groupId && global.Bot?.pickGroup(player2.groupId)) {
                 logger.debug(`[ArenaHandler] Sending forward message to player2's group ${player2.groupId}`);
-                global.Bot.pickGroup(player2.groupId).sendMsg(forwardMsg).catch(err => logger.error(`Error sending forward msg to player2's group ${player2.groupId}:`, err));
+                global.Bot.pickGroup(player2.groupId).sendMsg(forwardMsg).catch(err => {
+                    logger.error(`Error sending forward msg to player2's group ${player2.groupId}:`, err);
+                    if (player2.e) { // Fallback to reply if group send fails for P2
+                        logger.debug(`[ArenaHandler] Fallback after group send fail for P2: Sending forward message via player2's event`);
+                        player2.e.reply(forwardMsg).catch(errReply => logger.error(`Error replying forward msg via player2's event after group fail:`, errReply));
+                    }
+                });
             } else if (player2.e) {
                 logger.debug(`[ArenaHandler] Fallback: Sending forward message via player2's event`);
                 player2.e.reply(forwardMsg).catch(err => logger.error(`Error replying forward msg via player2's event:`, err));
@@ -484,6 +508,7 @@ async function sendArenaMessageToBothWithForward(player1, player2, contentArray,
         }
     }
 }
+
 
 // --- 新增 AI 竞技场功能 ---
 export async function handleJoinAiArena(e, pluginInstance) {

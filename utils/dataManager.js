@@ -149,7 +149,7 @@ async function saveDailySeedShopData(data) { // 新增
     }
 }
 
-async function getPlayerData(userId, nickname = '') {
+async function getPlayerData(userId, nicknameFromEvent = '') { // Renamed 'nickname' to 'nicknameFromEvent' for clarity
     const playerFile = path.join(playersDir, `${userId}.json`);
     let loadedPlayerData = null;
     const currentLogger = global.logger || console;
@@ -166,7 +166,8 @@ async function getPlayerData(userId, nickname = '') {
         isNewPlayer = true;
         finalPlayerData = {
             userId: userId,
-            nickname: nickname || `调查员${String(userId).slice(-4)}`,
+            nickname: nicknameFromEvent || `调查员${String(userId).slice(-4)}`, // Use nicknameFromEvent for new players
+            fixedNickname: "", // <<< NEW FIELD
             funds: 100,
             heldWeapons: [INITIAL_WEAPON_NAME],
             collectibles: [],
@@ -184,9 +185,10 @@ async function getPlayerData(userId, nickname = '') {
             seedsOfLight: 0,
             pityCounter5Star: 0,
             current5StarBonusRate: 0.0,
-            lastAiArenaEntryTime: 0 // 新增AI竞技场冷却时间戳
+            lastAiArenaEntryTime: 0
         };
-        if (weaponsData.length === 0) await loadAllBaseData();
+        // Ensure base data is loaded if needed for INITIAL_WEAPON_NAME check (though it should be fine here)
+        // if (weaponsData.length === 0) await loadAllBaseData(); // Usually not needed here if called after init
 
         const saveSuccess = await savePlayerData(userId, finalPlayerData);
         if (saveSuccess) {
@@ -196,12 +198,13 @@ async function getPlayerData(userId, nickname = '') {
         }
     } else {
         finalPlayerData = loadedPlayerData;
-        // 确保老玩家数据也包含所有字段
+        // Ensure old players also have the new field and other essential fields
+        if (typeof finalPlayerData.fixedNickname === 'undefined') finalPlayerData.fixedNickname = ""; // <<< NEW FIELD
         if (!finalPlayerData.heldWeapons) finalPlayerData.heldWeapons = [];
         if (!finalPlayerData.heldWeapons.includes(INITIAL_WEAPON_NAME)) {
             finalPlayerData.heldWeapons.push(INITIAL_WEAPON_NAME);
-            currentLogger.info(`[AdventureGame/DataManager] 为老玩家 ${userId} (${finalPlayerData.nickname}) 补发了初始武器 '${INITIAL_WEAPON_NAME}'。`);
         }
+        // ... (other existing checks for old player data)
         if (!finalPlayerData.collectibles) finalPlayerData.collectibles = [];
         if (!finalPlayerData.purchasedTitles) finalPlayerData.purchasedTitles = [];
         if (typeof finalPlayerData.activeTitle === 'undefined') finalPlayerData.activeTitle = "";
@@ -217,18 +220,31 @@ async function getPlayerData(userId, nickname = '') {
         if (typeof finalPlayerData.seedsOfLight === 'undefined') finalPlayerData.seedsOfLight = 0;
         if (typeof finalPlayerData.pityCounter5Star === 'undefined') finalPlayerData.pityCounter5Star = 0;
         if (typeof finalPlayerData.current5StarBonusRate === 'undefined') finalPlayerData.current5StarBonusRate = 0.0;
-        if (typeof finalPlayerData.lastAiArenaEntryTime === 'undefined') finalPlayerData.lastAiArenaEntryTime = 0; // 确保老玩家也有此字段
+        if (typeof finalPlayerData.lastAiArenaEntryTime === 'undefined') finalPlayerData.lastAiArenaEntryTime = 0;
 
 
-        if (nickname && finalPlayerData.nickname !== nickname) {
-            finalPlayerData.nickname = nickname;
-            savePlayerData(userId, finalPlayerData).catch(err => {
+        // <<< NICKNAME LOGIC MODIFICATION >>>
+        let shouldSave = false;
+        if (finalPlayerData.fixedNickname && finalPlayerData.fixedNickname.trim() !== "") {
+            if (finalPlayerData.nickname !== finalPlayerData.fixedNickname) {
+                finalPlayerData.nickname = finalPlayerData.fixedNickname;
+                shouldSave = true; // Save if fixedNickname overrides current nickname
+            }
+        } else if (nicknameFromEvent && finalPlayerData.nickname !== nicknameFromEvent) {
+            // Only update from event if no fixed nickname is set and event nickname differs
+            finalPlayerData.nickname = nicknameFromEvent;
+            shouldSave = true;
+        }
+
+        if (shouldSave) {
+            await savePlayerData(userId, finalPlayerData).catch(err => { // Make sure to await
                 currentLogger.error(`[AdventureGame/DataManager] 更新玩家 ${userId} 昵称时保存失败:`, err);
             });
         }
     }
     return { playerData: finalPlayerData, isNewPlayer };
 }
+
 
 async function savePlayerData(userId, data) {
     const playerFile = path.join(playersDir, `${userId}.json`);

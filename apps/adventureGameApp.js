@@ -87,6 +87,7 @@ export class AdventureGame extends plugin {
                     fnc: 'buyFromSeedShop',
                     priority: 501,
                 },
+                { reg: `^#改名\\s*(.+)$`, fnc: 'setFixedNicknameCommand' },
                 // 新增AI竞技场规则
                 { reg: '^#AI竞技场$', fnc: 'joinAiArena' },
             ]
@@ -123,7 +124,7 @@ export class AdventureGame extends plugin {
     async getPlayer(userId, nickname = '') {
         return await getPlayerData(userId, nickname);
     }
-
+    async setFixedNicknameCommand(e) { return await infoHandler.handleSetFixedNickname(e, this); }
     // --- 原有规则函数 ---
     async enterMap(e) { return await gameHandler.handleEnterMap(e, this); }
     async leaveQueue(e) { return await gameHandler.handleLeaveQueue(e, this); }
