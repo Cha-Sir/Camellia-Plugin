@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游戏数据编辑器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .modal { display: none; /* Hidden by default */ }
+        .modal.active { display: flex; /* Show when active */ }
+        /* Custom scrollbar for textarea */
+        textarea {
+            scrollbar-width: thin;
+            scrollbar-color: #9ca3af #e5e7eb; /* gray-400 gray-200 */
+        }
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #e5e7eb; /* gray-200 */
+            border-radius: 10px;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background-color: #9ca3af; /* gray-400 */
+            border-radius: 10px;
+            border: 2px solid #e5e7eb; /* gray-200 */
+        }
+        .table-cell-truncate {
+            max-width: 150px; /* Adjust as needed */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .table-header-nowrap {
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 sm:p-6 md:p-8">
+<div class="container mx-auto bg-white p-4 sm:p-6 md:p-8 rounded-lg shadow-xl">
+    <header class="mb-6 text-center">
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-700">游戏数据编辑器</h1>
+    </header>
+
+    <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <label for="dataTypeSelect" class="block text-sm font-medium text-gray-700 mb-1">选择数据类型:</label>
+            <select id="dataTypeSelect" class="block w-full sm:w-64 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="items">物品 (Items)</option>
+                <option value="publicItems">公共物品 (Public Items)</option>
+                <option value="weapons">武器 (Weapons)</option>
+                <option value="titles">称号 (Titles)</option>
+                <option value="npcs">NPCs</option>
+                <option value="maps">地图 (Maps)</option>
+            </select>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2 mt-2 sm:mt-0">
+            <button id="addNewEntryBtn" class="w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition duration-150">
+                添加新条目
+            </button>
+            <button id="downloadJsonBtn" class="w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition duration-150">
+                下载当前JSON
+            </button>
+        </div>
+    </div>
+
+    <div id="dataDisplayArea" class="overflow-x-auto">
+        <table id="dataTable" class="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-md">
+            <thead class="bg-gray-50">
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+            </tbody>
+        </table>
+        <p id="noDataMessage" class="text-center text-gray-500 py-4">请选择数据类型以显示数据。</p>
+    </div>
+</div>
+
+<div id="editorModal" class="modal fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full items-center justify-center p-4">
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div class="flex justify-between items-center p-4 border-b border-gray-200">
+            <h3 id="modalTitle" class="text-xl font-semibold text-gray-800">编辑条目</h3>
+            <button id="closeModalBtn" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <form id="editorForm" class="p-4 space-y-4 overflow-y-auto flex-grow">
+        </form>
+        <div class="p-4 border-t border-gray-200 flex justify-end space-x-3">
+            <button id="cancelChangesBtn" type="button" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition duration-150">取消</button>
+            <button id="saveChangesBtn" type="button" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition duration-150">保存</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Embedded JSON Data ---
+    const rawData = {
+        items: JSON.parse(`[{"name":"应急口粮棒","price":10,"rarity":"普通","type":"item","description":"维持基本生理需求的压缩食品，味道和包装一样乏善可陈。"},{"name":"损坏的义体零件","price":15,"rarity":"普通","type":"item","description":"来源不明的义体部件，布满划痕，似乎经历过激烈的冲突。"},{"name":"“安定”注射剂","price":30,"rarity":"普通","type":"item","description":"短效精神稳定剂，能暂时压制恐慌，但有轻微的认知模糊副作用。"},{"name":"加密数据盘","price":140,"rarity":"稀有","type":"item","description":"一块无法直接读取的数据盘，表面覆盖着复杂的加密纹路。"},{"name":"“呢喃”石块","price":180,"rarity":"稀有","type":"item","description":"握在手中时能听到微弱、无法理解的低语，来源不明。"},{"name":"认知滤镜碎片","price":550,"rarity":"罕见","type":"item","description":"一种能扭曲或修正感官输入的装置残片，效果未知。"},{"name":"“代价”契约残页","price":580,"rarity":"罕见","type":"item","description":"某种古老契约的一部分，上面用无法解读的文字书写着索取与给予的条款。"},{"name":"“观测者”之眼","price":1900,"rarity":"史诗","type":"item","description":"一颗冰冷的机械义眼，据说能洞察常人无法感知的“真实”。"},{"name":"扭曲核心样本","price":1300,"rarity":"史诗","type":"item","description":"从某个“异常”现象中心提取的物质，其物理性质极不稳定。"},{"name":"“图书馆”入场券","price":4000,"rarity":"传奇","type":"item","description":"一张散发着微光的卡片，上面写着“欢迎来到图书馆，寻找属于你的书吧”。"},{"name":"“都市之星”碎片","price":5000,"rarity":"传奇","type":"item","description":"传说中支撑着这座无尽都市运转的“星”的微小残片，蕴含着难以想象的力量。"},{"name":"空白书页","price":16000,"rarity":"收藏品","type":"collectible","description":"一张看似普通的空白书页，但在特定条件下似乎能显现出文字。"},{"name":"破损的邀请函","price":18000,"rarity":"收藏品","type":"collectible","description":"一封发出者不明的邀请函，目的地被污渍掩盖，只留下“禁忌区域”的字样。"},{"name":"“回响”调音叉","price":23000,"rarity":"收藏品","type":"collectible","description":"敲击时会发出能引起周围环境异常共鸣的声波，用途不明。"},{"name":"干涸的血晶","price":30000,"rarity":"收藏品","type":"collectible","description":"从【殷红迷雾】卡利身上掉落的奇异晶体，似乎蕴含着凝固的生命力。"},{"name":"迷雾核心","price":12000,"rarity":"收藏品","type":"collectible","description":"【殷红迷雾】卡利的力量之源，散发着不祥的红色光芒。"},{"name":"一袋可疑零件","price":15000,"rarity":"收藏品","type":"collectible","description":"从【街边收尾人】杰克处获得的零件，用途不明，但或许能在黑市卖点小钱。"},{"name":"黑市通行证（伪）","price":15000,"rarity":"收藏品","type":"collectible","description":"一张伪造的黑市通行证，做工粗糙，但或许能唬住一些守卫。"},{"name":"损坏的哨兵核心","price":40000,"rarity":"收藏品","type":"collectible","description":"来自被摧毁的哨兵7号，核心部件已损坏，但仍有研究价值。"}]`),
+        publicItems: JSON.parse(`[{"name":"标准能量单元","price":25,"rarity":"普通","type":"item","description":"一块标准规格的能量电池，用途广泛。"},{"name":"急救喷雾剂","price":35,"rarity":"普通","type":"item","description":"能快速处理轻微伤口的医疗喷雾。"},{"name":"废弃的芯片组","price":50,"rarity":"稀有","type":"item","description":"一组来源不明的旧式芯片，或许还能提取出一些有用的数据。"},{"name":"万能工具组","price":120,"rarity":"稀有","type":"item","description":"包含多种常用工具的组合包，应对突发状况的利器。"},{"name":"“幽影”干扰器 (原型)","price":0,"baseCombatPower":10,"passive":"短暂隐匿","passiveType":"evasion_boost_post_combat","passiveValue":0.20,"passiveDescription":"战斗失利后，有20%额外几率无伤或轻伤脱离。","rarity":"罕见","type":"weapon","description":"一个实验性的干扰装置，能在短时间内扭曲使用者的光学信号，辅助撤退。"},{"name":"“洞察”辅助目镜 (损坏)","price":20000,"rarity":"收藏品","type":"collectible","description":"一个损坏的战术目镜，核心功能缺失，但其精密结构仍有收藏价值。"}]`),
+        weapons: JSON.parse(`[{"name":"制式警棍","price":0,"baseCombatPower":50,"passive":"无","passiveType":"none","passiveDescription":"标准制式装备，无特殊机能。","rarity":"普通","description":"都市治安维持部队的标准化装备，可靠但平庸。新手必备，无法被夺走或出售。"},{"name":"撕裂者手斧","price":12000,"baseCombatPower":120,"passive":"破片效应","passiveType":"power_boost_percentage","passiveValue":0.15,"passiveDescription":"攻击时能造成额外的撕裂伤，提升15%基础威胁评估。","rarity":"稀有","description":"经过粗糙改造的消防斧。"},{"name":"过载充能枪","price":14000,"baseCombatPower":180,"passive":"不稳定输出","passiveType":"conditional_power_boost_or_debuff","passiveValue":{"boost":0.3,"debuff":-0.2,"condition_threshold_multiplier":0.75,"debuff_chance":0.1},"passiveDescription":"若目标威胁评估高于自身75%，则威力激增30%；否则有10%几率失控反噬，威力降低20%。","rarity":"史诗","description":"一把实验性的能量武器，威力巨大，但有失控的风险。"},{"name":"鹰眼改装手枪","price":6000,"baseCombatPower":100,"passive":"精准校准","passiveType":"power_boost_percentage","passiveValue":0.12,"passiveDescription":"高级瞄准模块显著提升了命中关键部位的几率，提升12%基础威胁评估。","rarity":"稀有","description":"加装了高级瞄准模块的手枪。"},{"name":"迷茫瓦斯榴弹","price":10000,"baseCombatPower":80,"passive":"认知干扰","passiveType":"target_power_debuff_percentage","passiveValue":0.15,"passiveDescription":"释放特殊瓦斯干扰目标感官与判断力，使其威胁评估临时降低15%。基础威胁评估较低，依赖特性。","rarity":"罕见","description":"释放出能干扰目标感官与判断力的特殊瓦斯。"},{"name":"守护力场手套","price":12000,"baseCombatPower":80,"passive":"偏折力场","passiveType":"power_boost_percentage_defense_only","passiveValue":0.2,"passiveDescription":"能短时间生成小型偏折力场，作为防守方时，等效威胁评估提升20%。","rarity":"罕见","description":"能短时间生成小型偏折力场，抵御攻击。"},{"name":"低语法术书","price":25000,"baseCombatPower":180,"passive":"异界低语","passiveType":"power_boost_percentage","passiveValue":0.22,"passiveDescription":"引导出不可名状的力量，提升22%基础威胁评估，但也可能带来未知风险(暂未实现)。","rarity":"史诗","description":"一本记录着禁忌知识的书籍。"},{"name":"薄瞑","price":500000,"baseCombatPower":650,"passive":"存在抹消","passiveType":"direct_success_rate_modifier_conditional","passiveValue":{"rate_modifier":1,"trigger_chance":0.05},"passiveDescription":"有5%的极低概率直接抹消目标的存在，无视战力差，强制战斗胜利；未触发时，锋刃依旧致命。","rarity":"传奇","description":"一把散发着不祥气息的黑色长刃，传说被其斩杀者将彻底消失于所有记录与记忆之中。"},{"name":"“血怒”战斧","price":18000,"baseCombatPower":150,"passive":"愈战愈勇","passiveType":"power_boost_if_self_wounded","passiveValue":0.3,"passiveDescription":"当自身处于负伤状态时，激发狂怒，基础威胁评估提升30%。","rarity":"罕见","description":"沾染了无数鲜血的战斧，在使用者受伤时会发出嗜血的渴望。"},{"name":"“猎手”义眼","price":22000,"baseCombatPower":170,"passive":"弱点洞察","passiveType":"power_boost_if_target_wounded","passiveValue":0.35,"passiveDescription":"如果目标已负伤，能精准锁定其弱点进行打击，基础威胁评估提升35%。","rarity":"史诗","description":"高级义眼，能分析并高亮显示目标的结构弱点。"},{"name":"“不屈”核心","price":30000,"baseCombatPower":100,"passive":"无视损伤","passiveType":"ignore_self_wounded_status","passiveDescription":"核心内置的应急系统能让你在负伤时依旧保持标准战斗出力，不会受到负伤的战力惩罚。","rarity":"史诗","description":"一种特殊的植入体核心，能极大增强使用者的韧性。"},{"name":"“诡诈”匕首","price":28000,"baseCombatPower":100,"passive":"逆转乾坤","passiveType":"direct_success_rate_modifier","passiveValue":0.15,"passiveDescription":"通过出其不意的攻击，直接提升15%的战斗成功率，无视部分战力差距。","rarity":"史诗","description":"一把淬有特殊神经毒素的匕首，总能找到意想不到的攻击角度。"},{"name":"“幽灵”披风","price":16000,"baseCombatPower":120,"passive":"紧急脱离","passiveType":"escape_boost_post_combat","passiveValue":0.25,"passiveDescription":"在战斗失利后，有额外25%的几率成功脱离（包括无伤或受伤状态）。","rarity":"罕见","description":"采用光学迷彩材料制成的披风，能辅助使用者在混乱中撤退。"},{"name":"求生者工具包","price":13000,"baseCombatPower":30,"passive":"顽强意志","passiveType":"post_combat_ignore_wound","passiveDescription":"即使战斗失利，也有极大可能仅受轻伤或避免进入“负伤”状态，从而保留物资。","rarity":"罕见","description":"包含各种应急物资和简易修复工具，提升了恶劣环境下的生存能力。"},{"name":"血色长镰","price":0,"baseCombatPower":270,"passive":"猩红渴望","passiveType":"power_boost_if_target_wounded","passiveValue":0.3,"passiveDescription":"若目标已负伤，此武器造成的威胁额外提升30%。","rarity":"史诗","description":"一把渴望鲜血的长镰，在敌人虚弱时更为致命。由【殷红迷雾】卡利持有。"},{"name":"改装冲击钻","price":0,"baseCombatPower":150,"passive":"破甲一击","passiveType":"target_debuff_on_hit_chance","passiveValue":{"debuffEffect":"reduce_power_percentage","debuffAmount":0.1,"chance":0.4},"passiveDescription":"攻击命中时有40%几率破坏目标部分装甲，使其后续受到的伤害增加（目标临时战力降低10%）。","rarity":"稀有","description":"街头巷战的粗犷改装，专治各种不服。由【街边收尾人】杰克持有。"},{"name":"制式脉冲步枪","price":0,"baseCombatPower":140,"passive":"连发射击","passiveType":"multi_hit_chance","passiveValue":{"extra_hits":1,"chance_per_hit":0.3,"damage_modifier_per_hit":0.5},"passiveDescription":"有30%的几率进行一次额外的追击射击（造成50%基础伤害）。","rarity":"稀有","description":"标准化的区域控制武器，性能稳定。由哨兵7号持有。"},{"name":"流放者砍刀","price":50,"baseCombatPower":60,"passive":"无","passiveType":"none","passiveDescription":"标准装备，无特殊机能。","rarity":"普通","description":"一把破旧的砍刀。"}]`),
+        titles: JSON.parse(`[{"name":"都市游魂","price":1000,"description":"在都市的阴影中穿梭，不为人知。"},{"name":"拾荒新手","price":500,"description":"刚刚踏入这片废墟，一切都是新的。"},{"name":"黑市常客","price":5000,"description":"熟悉每一条隐秘的交易渠道。"},{"name":"战斗尖兵","price":8000,"description":"在冲突中总是冲在最前。"},{"name":"幸运星","price":12000,"description":"似乎总能逢凶化吉。(暂无实际游戏效果)"},{"name":"区域清道夫","price":20000,"description":"所到之处，寸草不生...我是说，片甲不留！"}]`),
+        npcs: JSON.parse(`[{"id":"npc_kalix_mistweaver","name":"卡利","title":"殷红迷雾","hostility":"hostile","baseCombatPower":180,"weapon":{"name":"血色长镰","baseCombatPower":270,"passive":"猩红渴望","passiveType":"power_boost_if_target_wounded","passiveValue":0.3,"passiveDescription":"若目标已负伤，此武器造成的威胁额外提升30%。","rarity":"史诗","description":"一把渴望鲜血的长镰，在敌人虚弱时更为致命。"},"uniqueLoot":[{"type":"collectible","name":"干涸的血晶","dropChance":0.5,"rarity":"罕见","price":300},{"type":"collectible","name":"迷雾核心","dropChance":0.2,"rarity":"史诗","price":1200},{"type":"weapon","name":"血色长镰","dropChance":0.05}],"combatPassive":{"type":"suppression","name":"恐惧压制","description":"【恐惧压制】卡利的攻击使对手感到恐惧。若对手的基础战力低于卡利，其最终战斗成功率不会高于40%。","details":{"maxSuccessRateForOpponent":0.40}},"dialogue":{"onEncounter":"又一个迷途的羔羊，将在迷雾中消散...","onDefeat":"迷雾...尚未...散去..."}},{"id":"npc_jack_fixer","name":"杰克","title":"街边收尾人","hostility":"neutral","baseCombatPower":120,"weapon":{"name":"改装冲击钻","baseCombatPower":110,"passive":"破甲一击","passiveType":"target_debuff_on_hit_chance","passiveValue":{"debuffEffect":"reduce_power_percentage","debuffAmount":0.15,"chance":0.4},"passiveDescription":"攻击命中时有40%几率破坏目标部分装甲，使其威胁评估临时降低15%。","rarity":"稀有","description":"街头巷战的粗犷改装，专治各种不服。"},"uniqueLoot":[{"type":"collectible","name":"一袋可疑零件","dropChance":0.6,"rarity":"普通","price":50},{"type":"collectible","name":"黑市通行证（伪）","dropChance":0.3,"rarity":"稀有","price":250},{"type":"weapon","name":"改装冲击钻","dropChance":0.1}],"combatPassive":{"type":"master_escape","name":"逃跑大师","description":"【逃跑大师】杰克总能找到脱身的机会。若战局不利（自身战力远低于对手），将有极高概率直接脱离战斗。","details":{"escapeChance":0.90,"powerRatioThreshold":0.6}},"dialogue":{"onEncounter":"嘿，小子。找麻烦？还是想“修理”点什么？","onDefeat":"可恶...算你狠...这笔账我记下了！","onEscape":"哈，想抓我？下辈子吧！"}},{"id":"npc_sentinel_unit_7","name":"哨兵7号","title":"区域巡逻者","hostility":"hostile","baseCombatPower":150,"weapon":{"name":"制式脉冲步枪（哨兵型）","baseCombatPower":140,"passive":"精确点射","passiveType":"critical_hit_success_boost","passiveValue":{"successRateBonus":0.10},"passiveDescription":"连续的精确射击更容易抓住敌方破绽，直接提升10%的最终战斗成功概率。","rarity":"稀有","description":"标准化的区域控制武器，哨兵7号特化型号，注重单点突破。"},"uniqueLoot":[{"type":"item","name":"标准能量单元","dropChance":0.7,"rarity":"普通","price":25},{"type":"collectible","name":"损坏的哨兵核心","dropChance":0.25,"rarity":"罕见","price":400},{"type":"weapon","name":"制式脉冲步枪（哨兵型）","dropChance":0.03}],"combatPassive":{"type":"power_surge_on_engage","name":"过载核心","description":"【过载核心】哨兵7号在进入战斗时会短时间过载其核心，无论是主动攻击还是被动防御，其基础威胁评估都会提升40点。","details":{"powerBoost":40}},"dialogue":{"onEncounter":"侦测到未授权单位...威胁等级评估中...执行清除协议...","onDefeat":"系统...机能...停止...错误...错误...","onEngage":"目标锁定，开始压制！"}},{"id":"npc_1","name":"无名收尾人耗子","title":"耗子","hostility":"hostile","baseCombatPower":50,"weapon":{"name":"流放者砍刀","baseCombatPower":50,"passive":"无","passiveType":"none","passiveDescription":"标准装备，无特殊机能。","rarity":"普通","description":"一把破旧的砍刀。"},"uniqueLoot":[{"type":"item","name":"耗子内脏","dropChance":0.7,"rarity":"稀有","price":55},{"type":"collectible","name":"后巷通行证","dropChance":0.01,"rarity":"收藏品","price":40000},{"type":"weapon","name":"流放者砍刀","dropChance":0.5}],"combatPassive":{"type":"none","name":"无特殊能力","description":"该单位无特殊战斗能力。"},"dialogue":{"onEncounter":"内脏……","onDefeat":"不要，挖走，我的……","onEngage":"就拿你开刀吧！"}}]`),
+        maps: JSON.parse(`[{"name":"普通大坝","entryFee":0,"limitCombatPower":0,"playerCapacity":5,"itemPool":{"普通":["损坏的义体零件","应急口粮棒",{"name":"制式警棍","type":"weapon"}],"稀有":["加密数据盘","“呢喃”石块",{"name":"“鹰眼”改装手枪","type":"weapon"}],"罕见":["认知滤镜碎片","“代价”契约残页"],"史诗":[{"name":"“撕裂者”手斧","type":"weapon"}],"传奇":[],"收藏品":["空白书页"]},"refreshRate":{"普通":0.42,"稀有":0.47,"罕见":0.16,"史诗":0.06,"传奇":0.01,"收藏品":0.01},"npcSpawnChance":0.2,"maxNpcsToSpawn":4,"availableNpcIds":["npc_jack_fixer","npc_1"],"npcFillDelayMinutes":3,"description":"曾经是繁华的都市下层聚居区，如今已被遗弃，只有扭曲的金属结构和若有若无的低语在回荡。"},{"name":"废弃的“巢”区","entryFee":800,"limitCombatPower":90,"playerCapacity":7,"itemPool":{"普通":["损坏的义体零件","应急口粮棒",{"name":"制式警棍","type":"weapon"}],"稀有":["加密数据盘","“呢喃”石块",{"name":"“鹰眼”改装手枪","type":"weapon"}],"罕见":["认知滤镜碎片","“代价”契约残页"],"史诗":[{"name":"“撕裂者”手斧","type":"weapon"}],"传奇":[],"收藏品":["空白书页"]},"refreshRate":{"普通":0.42,"稀有":0.47,"罕见":0.16,"史诗":0.06,"传奇":0.01,"收藏品":0.01},"npcSpawnChance":0.65,"maxNpcsToSpawn":3,"availableNpcIds":["npc_kalix_mistweaver","npc_jack_fixer","npc_sentinel_unit_7"],"npcFillDelayMinutes":5,"description":"曾经是繁华的都市下层聚居区，如今已被遗弃，只有扭曲的金属结构和若有若无的低语在回荡。"},{"name":"“认知”污染区","entryFee":4000,"limitCombatPower":100,"playerCapacity":5,"itemPool":{"普通":["“安定”注射剂","应急口粮棒",{"name":"制式警棍","type":"weapon"}],"稀有":["“呢喃”石块"],"罕见":["认知滤镜碎片",{"name":"“迷茫”瓦斯榴弹","type":"weapon"}],"史诗":[],"传奇":[],"收藏品":["破损的邀请函"]},"refreshRate":{"普通":0.5,"稀有":0.28,"罕见":0.13,"史诗":0.03,"传奇":0.01,"收藏品":0.05},"npcSpawnChance":0.5,"maxNpcsToSpawn":3,"availableNpcIds":["npc_kalix_mistweaver","npc_1"],"npcFillDelayMinutes":4,"description":"由于未知“异常”泄露导致感官与认知极易受到干扰的区域，深入其中需要极大的意志力。"},{"name":"“图书馆”外围","entryFee":8000,"limitCombatPower":200,"playerCapacity":6,"itemPool":{"普通":["损坏的义体零件"],"稀有":["加密数据盘",{"name":"“守护”力场手套","type":"weapon"}],"罕见":["“代价”契约残页","认知滤镜碎片"],"史诗":["“观测者”之眼","扭曲核心样本",{"name":"“过载”充能枪","type":"weapon"}],"传奇":[{"name":"“低语”法术书","type":"weapon"}],"收藏品":["“回响”调音叉"]},"refreshRate":{"普通":0.12,"稀有":0.33,"罕见":0.2,"史诗":0.18,"传奇":0.09,"收藏品":0.08},"npcSpawnChance":0.4,"maxNpcsToSpawn":2,"availableNpcIds":["npc_sentinel_unit_7","npc_jack_fixer","npc_1"],"npcFillDelayMinutes":6,"description":"传说中收容着世间所有知识与故事的“图书馆”的边缘地带，徘徊着寻求知识的“访客”与守护秘密的“司书”。"},{"name":"后台测试区","entryFee":0,"limitCombatPower":0,"playerCapacity":2,"itemPool":{"普通":["应急口粮棒",{"name":"制式脉冲步枪","type":"weapon"}],"稀有":[{"name":"求生者工具包","type":"weapon"}],"罕见":["认知滤镜碎片"],"史诗":[{"name":"流放者砍刀","type":"weapon"}],"传奇":["“都市之星”碎片"],"收藏品":["空白书页"]},"refreshRate":{"普通":0.3,"稀有":0.25,"罕见":0.2,"史诗":0,"传奇":0,"收藏品":0},"npcSpawnChance":0.9,"maxNpcsToSpawn":1,"availableNpcIds":["npc_kalix_mistweaver"],"npcFillDelayMinutes":1,"description":"系统管理员用于调试各项参数的虚拟空间，现象极不稳定。"},{"name":"测试大坝","entryFee":0,"limitCombatPower":0,"playerCapacity":2,"itemPool":{"普通":["损坏的义体零件","应急口粮棒",{"name":"制式警棍","type":"weapon"}],"稀有":["加密数据盘","“呢喃”石块",{"name":"“鹰眼”改装手枪","type":"weapon"}],"罕见":["认知滤镜碎片","“代价”契约残页"],"史诗":[{"name":"“撕裂者”手斧","type":"weapon"}],"传奇":[],"收藏品":["空白书页"]},"refreshRate":{"普通":0.42,"稀有":0.47,"罕见":0.16,"史诗":0.06,"传奇":0.01,"收藏品":0.01},"npcSpawnChance":0.3,"maxNpcsToSpawn":5,"availableNpcIds":["npc_1"],"npcFillDelayMinutes":5,"description":"曾经是繁华的都市下层聚居区，如今已被遗弃，只有扭曲的金属结构和若有若无的低语在回荡。"}]`)
+    };
+
+    // --- Application State ---
+    let currentDataType = 'items'; // Default data type
+    let dataStore = JSON.parse(JSON.stringify(rawData)); // Deep copy to allow modifications
+    let editingIndex = -1; // -1 for adding new, otherwise index of item being edited
+    let rarityOptions = [];
+
+    // --- Schemas and Translations ---
+    const fieldSchemas = {
+        items: {
+            name: { label: "名称", type: "text" },
+            price: { label: "价格", type: "number" },
+            rarity: { label: "稀有度", type: "select", options: rarityOptions },
+            type: { label: "类型", type: "text" },
+            description: { label: "描述", type: "textarea" }
+        },
+        publicItems: {
+            name: { label: "名称", type: "text" },
+            price: { label: "价格", type: "number" },
+            rarity: { label: "稀有度", type: "select", options: rarityOptions },
+            type: { label: "类型", type: "text" }, // e.g., item, collectible, weapon
+            description: { label: "描述", type: "textarea" },
+            baseCombatPower: { label: "基础战斗力", type: "number", optional: true },
+            passive: { label: "被动技能", type: "text", optional: true },
+            passiveType: { label: "被动技能类型", type: "text", optional: true },
+            passiveValue: { label: "被动技能数值 (JSON)", type: "textarea", isJson: true, optional: true },
+            passiveDescription: { label: "被动技能描述", type: "textarea", optional: true }
+        },
+        weapons: {
+            name: { label: "名称", type: "text" },
+            price: { label: "价格", type: "number" },
+            baseCombatPower: { label: "基础战斗力", type: "number" },
+            passive: { label: "被动技能", type: "text" },
+            passiveType: { label: "被动技能类型", type: "text" },
+            passiveValue: { label: "被动技能数值 (JSON)", type: "textarea", isJson: true },
+            passiveDescription: { label: "被动技能描述", type: "textarea" },
+            rarity: { label: "稀有度", type: "select", options: rarityOptions },
+            description: { label: "描述", type: "textarea" }
+        },
+        titles: {
+            name: { label: "称号名称", type: "text" },
+            price: { label: "价格", type: "number" },
+            description: { label: "描述", type: "textarea" }
+        },
+        npcs: {
+            id: { label: "ID", type: "text" }, // Typically unique, can be editable or auto-generated
+            name: { label: "名称", type: "text" },
+            title: { label: "称号", type: "text" },
+            hostility: { label: "敌对状态", type: "select", options: ["hostile", "neutral", "friendly"] },
+            baseCombatPower: { label: "基础战斗力", type: "number" },
+            weapon: { label: "武器 (JSON)", type: "textarea", isJson: true, rows: 5 },
+            uniqueLoot: { label: "独特掉落 (JSON Array)", type: "textarea", isJson: true, rows: 5 },
+            combatPassive: { label: "战斗被动 (JSON)", type: "textarea", isJson: true, rows: 4 },
+            dialogue: { label: "对话 (JSON)", type: "textarea", isJson: true, rows: 3 }
+        },
+        maps: {
+            name: { label: "地图名称", type: "text" },
+            entryFee: { label: "进入费用", type: "number" },
+            limitCombatPower: { label: "限制战斗力", type: "number" },
+            playerCapacity: { label: "玩家容量", type: "number" },
+            itemPool: { label: "物品池 (JSON)", type: "textarea", isJson: true, rows: 8 },
+            refreshRate: { label: "刷新率 (JSON)", type: "textarea", isJson: true, rows: 4 },
+            npcSpawnChance: { label: "NPC生成几率 (0-1)", type: "number", step: "0.01", min:0, max:1 },
+            maxNpcsToSpawn: { label: "最大NPC生成数量", type: "number" },
+            availableNpcIds: { label: "可用NPC ID列表 (逗号分隔)", type: "text", isArray: true },
+            npcFillDelayMinutes: { label: "NPC填充延迟 (分钟)", type: "number" },
+            description: { label: "描述", type: "textarea" }
+        }
+    };
+
+    // --- DOM Elements ---
+    const dataTypeSelect = document.getElementById('dataTypeSelect');
+    const dataTable = document.getElementById('dataTable');
+    const dataTableHead = dataTable.querySelector('thead');
+    const dataTableBody = dataTable.querySelector('tbody');
+    const noDataMessage = document.getElementById('noDataMessage');
+    const editorModal = document.getElementById('editorModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const editorForm = document.getElementById('editorForm');
+    const saveChangesBtn = document.getElementById('saveChangesBtn');
+    const cancelChangesBtn = document.getElementById('cancelChangesBtn');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const addNewEntryBtn = document.getElementById('addNewEntryBtn');
+    const downloadJsonBtn = document.getElementById('downloadJsonBtn');
+
+    // --- Utility Functions ---
+    function getRarityOptions() {
+        const rarities = new Set();
+        if (rawData.items && Array.isArray(rawData.items)) {
+            rawData.items.forEach(item => {
+                if (item.rarity) rarities.add(item.rarity);
+            });
+        }
+        if (rawData.publicItems && Array.isArray(rawData.publicItems)) {
+            rawData.publicItems.forEach(item => {
+                if (item.rarity) rarities.add(item.rarity);
+            });
+        }
+        if (rawData.weapons && Array.isArray(rawData.weapons)) {
+            rawData.weapons.forEach(item => {
+                if (item.rarity) rarities.add(item.rarity);
+            });
+        }
+        rarityOptions = Array.from(rarities).sort();
+        // Update schemas that use rarityOptions
+        ['items', 'publicItems', 'weapons'].forEach(schemaKey => {
+            if (fieldSchemas[schemaKey] && fieldSchemas[schemaKey].rarity) {
+                fieldSchemas[schemaKey].rarity.options = rarityOptions;
+            }
+        });
+    }
+
+    function sanitizeHTML(str) {
+        const temp = document.createElement('div');
+        temp.textContent = str;
+        return temp.innerHTML;
+    }
+
+    // --- Rendering Functions ---
+    function renderTable() {
+        const data = dataStore[currentDataType] || [];
+        dataTableHead.innerHTML = '';
+        dataTableBody.innerHTML = '';
+
+        if (!data.length) {
+            dataTable.classList.add('hidden');
+            noDataMessage.classList.remove('hidden');
+            noDataMessage.textContent = `没有找到 '${currentDataType}' 类型的数据。`;
+            return;
+        }
+
+        dataTable.classList.remove('hidden');
+        noDataMessage.classList.add('hidden');
+
+        const schema = fieldSchemas[currentDataType];
+        const headers = Object.keys(schema);
+
+        // Create table headers
+        const headerRow = document.createElement('tr');
+        headers.forEach(headerKey => {
+            const th = document.createElement('th');
+            th.scope = 'col';
+            th.className = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider table-header-nowrap';
+            th.textContent = schema[headerKey].label;
+            headerRow.appendChild(th);
+        });
+        const actionsTh = document.createElement('th');
+        actionsTh.scope = 'col';
+        actionsTh.className = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+        actionsTh.textContent = '操作';
+        headerRow.appendChild(actionsTh);
+        dataTableHead.appendChild(headerRow);
+
+        // Create table rows
+        data.forEach((item, index) => {
+            const tr = document.createElement('tr');
+            tr.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+            headers.forEach(key => {
+                const td = document.createElement('td');
+                td.className = 'px-4 py-3 whitespace-nowrap text-sm text-gray-700 table-cell-truncate';
+                let value = item[key];
+                if (typeof value === 'object') {
+                    value = JSON.stringify(value);
+                } else if (Array.isArray(value) && schema[key].isArray) {
+                    value = value.join(', ');
+                }
+                td.textContent = value !== undefined && value !== null ? String(value) : '';
+                td.title = td.textContent; // Show full text on hover for truncated cells
+                tr.appendChild(td);
+            });
+
+            // Action buttons
+            const actionsTd = document.createElement('td');
+            actionsTd.className = 'px-4 py-3 whitespace-nowrap text-sm font-medium space-x-2';
+
+            const editButton = document.createElement('button');
+            editButton.textContent = '编辑';
+            editButton.className = 'text-indigo-600 hover:text-indigo-900 font-semibold';
+            editButton.onclick = () => openModalForEdit(index);
+            actionsTd.appendChild(editButton);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = '删除';
+            deleteButton.className = 'text-red-600 hover:text-red-900 font-semibold';
+            deleteButton.onclick = () => deleteEntry(index);
+            actionsTd.appendChild(deleteButton);
+
+            tr.appendChild(actionsTd);
+            dataTableBody.appendChild(tr);
+        });
+    }
+
+    function renderForm(data = {}) {
+        editorForm.innerHTML = '';
+        const schema = fieldSchemas[currentDataType];
+
+        for (const key in schema) {
+            const field = schema[key];
+            const value = data[key];
+
+            const formGroup = document.createElement('div');
+            formGroup.className = 'mb-3';
+
+            const label = document.createElement('label');
+            label.htmlFor = `field-${key}`;
+            label.className = 'block text-sm font-medium text-gray-700 mb-1';
+            label.textContent = field.label + (field.optional ? ' (可选)' : '');
+            formGroup.appendChild(label);
+
+            let input;
+            if (field.type === 'textarea') {
+                input = document.createElement('textarea');
+                input.rows = field.rows || 3;
+                if (field.isJson) {
+                    input.value = value !== undefined ? JSON.stringify(value, null, 2) : '';
+                } else {
+                    input.value = value !== undefined ? value : '';
+                }
+            } else if (field.type === 'select') {
+                input = document.createElement('select');
+                (field.options || []).forEach(optValue => {
+                    const option = document.createElement('option');
+                    option.value = optValue;
+                    option.textContent = optValue;
+                    if (value === optValue) option.selected = true;
+                    input.appendChild(option);
+                });
+            } else {
+                input = document.createElement('input');
+                input.type = field.type;
+                if (field.type === 'number') {
+                    if (field.step) input.step = field.step;
+                    if (field.min !== undefined) input.min = field.min;
+                    if (field.max !== undefined) input.max = field.max;
+                }
+                if (field.isArray) { // For comma-separated arrays
+                    input.value = Array.isArray(value) ? value.join(', ') : (value || '');
+                } else {
+                    input.value = value !== undefined ? value : '';
+                }
+
+            }
+            input.id = `field-${key}`;
+            input.name = key;
+            input.className = 'mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500';
+            if (field.readonly) input.readOnly = true;
+
+            formGroup.appendChild(input);
+            editorForm.appendChild(formGroup);
+        }
+    }
+
+    // --- Modal Management ---
+    function openModalForEdit(index) {
+        editingIndex = index;
+        modalTitle.textContent = '编辑条目';
+        const currentData = dataStore[currentDataType][index];
+        renderForm(currentData);
+        editorModal.classList.add('active');
+    }
+
+    function openModalForAdd() {
+        editingIndex = -1;
+        modalTitle.textContent = '添加新条目';
+        const schema = fieldSchemas[currentDataType];
+        const defaultData = {};
+        // Initialize with default values or empty strings based on schema
+        Object.keys(schema).forEach(key => {
+            if (schema[key].isJson) {
+                defaultData[key] = schema[key].type === 'textarea' && schema[key].isJson && Array.isArray(schema[key].default) ? [] : {}; // Default to empty object or array for JSON textareas
+            } else if (schema[key].isArray) {
+                defaultData[key] = [];
+            } else if (schema[key].type === 'number') {
+                defaultData[key] = 0;
+            } else {
+                defaultData[key] = '';
+            }
+        });
+        renderForm(defaultData);
+        editorModal.classList.add('active');
+    }
+
+    function closeModal() {
+        editorModal.classList.remove('active');
+        editorForm.innerHTML = ''; // Clear form
+    }
+
+    // --- Data Manipulation ---
+    function handleFormSave() {
+        const formData = new FormData(editorForm);
+        const newEntry = {};
+        const schema = fieldSchemas[currentDataType];
+        let isValid = true;
+
+        for (const key in schema) {
+            const field = schema[key];
+            let value = formData.get(key);
+
+            if (field.type === 'number') {
+                value = parseFloat(value);
+                if (isNaN(value) && !(field.optional && formData.get(key) === '')) {
+                    alert(`字段 "${field.label}" 的值必须是数字。`);
+                    isValid = false; break;
+                }
+            }
+            if (field.isJson) {
+                try {
+                    value = JSON.parse(value);
+                } catch (e) {
+                    if (!(field.optional && value.trim() === '')) {
+                        alert(`字段 "${field.label}" 包含无效的JSON: ${e.message}`);
+                        isValid = false; break;
+                    } else if (field.optional && value.trim() === '') {
+                        value = undefined; // Store as undefined if optional and empty
+                    }
+                }
+            }
+            if (field.isArray) { // For comma-separated arrays
+                value = value ? value.split(',').map(s => s.trim()).filter(s => s) : [];
+            }
+
+            // Only add to entry if not optional and empty, or if it has a value
+            if (!(field.optional && (value === undefined || value === '' || (Array.isArray(value) && value.length === 0)))) {
+                newEntry[key] = value;
+            } else if (field.optional && (value === undefined || value === '')) {
+                // If optional and empty, explicitly remove it or don't add it,
+                // unless it's a JSON field that should be null/empty object/array
+                if (field.isJson && value === undefined) {
+                    // Allow undefined for optional JSON fields if they were empty
+                } else {
+                    delete newEntry[key]; // Ensure it's not in the object if truly empty optional
+                }
+            }
+
+        }
+
+        if (!isValid) return;
+
+        if (editingIndex === -1) { // Adding new
+            dataStore[currentDataType].push(newEntry);
+        } else { // Editing existing
+            dataStore[currentDataType][editingIndex] = newEntry;
+        }
+        renderTable();
+        closeModal();
+    }
+
+    function deleteEntry(index) {
+        if (confirm('确定要删除此条目吗？')) {
+            dataStore[currentDataType].splice(index, 1);
+            renderTable();
+        }
+    }
+
+    function downloadJSON() {
+        const dataStr = JSON.stringify(dataStore[currentDataType], null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+
+        const exportFileDefaultName = `${currentDataType}.json`;
+
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
+    }
+
+    // --- Event Listeners ---
+    dataTypeSelect.addEventListener('change', (e) => {
+        currentDataType = e.target.value;
+        renderTable();
+    });
+
+    addNewEntryBtn.addEventListener('click', openModalForAdd);
+    saveChangesBtn.addEventListener('click', handleFormSave);
+    closeModalBtn.addEventListener('click', closeModal);
+    cancelChangesBtn.addEventListener('click', closeModal);
+    downloadJsonBtn.addEventListener('click', downloadJSON);
+
+    // --- Initialization ---
+    function init() {
+        getRarityOptions(); // Populate rarity options first
+        // Set the initial selection and render the table
+        dataTypeSelect.value = currentDataType;
+        renderTable();
+    }
+
+    init();
+</script>
+</body>
+</html>
